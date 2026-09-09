@@ -1,0 +1,12 @@
+<script setup lang="ts">
+import { computed, ref } from 'vue'
+import { useRoute, useRouter } from 'vue-router'
+import { api } from '../api/mock'
+import type { Doctor, Slot } from '../types'
+const route = useRoute(); const router = useRouter(); const doctor = ref<Doctor>(); const loading = ref(false); const notice = ref('')
+api.getDoctor(route.params.id as string).then(v => doctor.value = v)
+const morning = computed(() => doctor.value?.slots.filter(s => s.period === '上午') ?? [])
+const afternoon = computed(() => doctor.value?.slots.filter(s => s.period === '下午') ?? [])
+async function choose(slot: Slot) { if (!doctor.value || loading.value) return; loading.value = true; notice.value = ''; try { if (slot.status === 'FULL') await api.waitlist(doctor.value, slot); else await api.reserve(doctor.value, slot); router.push('/appointments') } catch (e) { notice.value = e instanceof Error ? e.message : '预约失败，请重试' } finally { loading.value = false } }
+</script>
+<template><div v-if="doctor" class="page-section"><p class="crumb">预约挂号 / {{ doctor.department }} / 医生详情</p><section class="doctor-hero"><div class="avatar large" :style="{ background: doctor.color }">{{ doctor.initials }}</div><div><p class="eyebrow">{{ doctor.department }}</p><h1>{{ doctor.name }} <span>{{ doctor.title }}</span></h1><p>{{ doctor.specialty }}</p><small>本平台仅提供预约服务，不涉及病历与诊疗信息。</small></div></section><section class="schedule"><div class="schedule-head"><div><p class="eyebrow">SCHEDULE</p><h2>选择就诊时段</h2></div><div class="date-tabs"><button class="active">9月10日<br><small>周四</small></button><button>9月11日<br><small>周五</small></button><button>9月12日<br><small>周六</small></button></div></div><p v-if="notice" class="alert">{{ notice }}</p><div v-for="group in [{ title: '上午', slots: morning }, { title: '下午', slots: afternoon }]" :key="group.title" class="slot-group"><h3>{{ group.title }}</h3><div v-for="slot in group.slots" :key="slot.id" class="slot"><div><b>{{ slot.time }}</b><p>普通门诊 · 挂号费 ¥{{ slot.fee }}</p></div><span :class="slot.status === 'AVAILABLE' ? 'available' : 'full'">{{ slot.status === 'AVAILABLE' ? `剩余 ${slot.remaining} 号` : '已约满' }}</span><button :class="slot.status === 'FULL' ? 'secondary' : ''" @click="choose(slot)" :disabled="loading">{{ slot.status === 'FULL' ? '加入候补' : (loading ? '提交中…' : '预约') }}</button></div></div><p class="tip">提交后将锁定号源 15 分钟，请在规定时间内完成模拟支付；号源余量以提交结果为准。</p></section></div></template>

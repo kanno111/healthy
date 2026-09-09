@@ -1,0 +1,15 @@
+# IDE and operating-system files
+.idea/
+.DS_Store
+Thumbs.db
+
+# Java / Maven
+backend/target/
+backend/.env
+
+# Node / Vite
+frontend/node_modules/
+frontend/dist/
+frontend/verify-dist/
+frontend/*.tsbuildinfo
+
