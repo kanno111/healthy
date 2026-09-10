@@ -14,6 +14,11 @@ mybatis:
     map-underscore-to-camel-case: true
     default-enum-type-handler: org.apache.ibatis.type.EnumTypeHandler
 
+# 只输出 Mapper 执行的 SQL，便于本地开发排查；不会记录数据库密码。
+logging:
+  level:
+    com.healthy.appointment.mapper: debug
+
 jwt:
   secret: ${JWT_SECRET:healthy-appointment-local-development-secret-key-2026}
   ttl: PT24H

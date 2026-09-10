@@ -1,41 +1,47 @@
 <script setup lang="ts">
-import { ref } from 'vue'
+import { reactive, ref } from 'vue'
 import { useRouter } from 'vue-router'
-import { login as loginRequest, ApiError } from '../api/auth'
+import { login as loginRequest, register as registerRequest, ApiError } from '../api/auth'
 import { signIn, type UserRole } from '../stores/session'
 
+type AuthMode = 'LOGIN' | 'REGISTER'
 const router = useRouter()
-const role = ref<UserRole>('PATIENT')
+const mode = ref<AuthMode>('LOGIN')
+const loginRole = ref<UserRole>('PATIENT')
 const account = ref('patient_demo')
 const password = ref('123456')
 const error = ref('')
+const notice = ref('')
 const loading = ref(false)
+const registerForm = reactive({ username: '', password: '', name: '', phone: '', gender: 1 as 1 | 2 })
 
-function switchRole(value: UserRole) {
-  role.value = value
+function switchMode(value: AuthMode) { mode.value = value; error.value = ''; notice.value = '' }
+function switchLoginRole(value: UserRole) {
+  loginRole.value = value
   account.value = value === 'PATIENT' ? 'patient_demo' : 'staff_demo'
   password.value = '123456'
   error.value = ''
 }
-
 async function login() {
+  if (!account.value || !password.value) { error.value = '请输入账号和密码'; return }
+  const result = await loginRequest(account.value, password.value)
+  signIn(result)
+  await router.replace(result.role === 'STAFF' ? '/admin' : '/')
+}
+async function register() {
+  await registerRequest(registerForm)
+  account.value = registerForm.username
+  password.value = ''
+  loginRole.value = 'PATIENT'
+  mode.value = 'LOGIN'
+  notice.value = '注册成功，请使用新账号登录'
+}
+async function submit() {
   if (loading.value) return
-  if (!account.value || !password.value) {
-    error.value = '请输入账号和密码'
-    return
-  }
-
-  loading.value = true
-  error.value = ''
-  try {
-    const result = await loginRequest(account.value, password.value)
-    signIn(result)
-    router.replace(result.role === 'STAFF' ? '/admin' : '/')
-  } catch (e) {
-    error.value = e instanceof ApiError ? e.message : '登录失败，请稍后重试'
-  } finally {
-    loading.value = false
-  }
+  loading.value = true; error.value = ''; notice.value = ''
+  try { if (mode.value === 'LOGIN') await login(); else await register() }
+  catch (e) { error.value = e instanceof ApiError ? e.message : '操作失败，请稍后重试' }
+  finally { loading.value = false }
 }
 </script>
 
@@ -43,41 +49,36 @@ async function login() {
   <main class="login-page">
     <section class="login-intro">
       <div class="login-brand"><span class="brand-mark">+</span>智约医疗</div>
-      <div class="intro-copy">
-        <p class="eyebrow">SMART APPOINTMENT</p>
-        <h1>让号源调度<br>更有秩序。</h1>
-        <p>面向患者的便捷预约服务，和面向工作人员的可靠运营平台。</p>
-      </div>
-      <div class="intro-points">
-        <span>✓ 号源实时调度</span>
-        <span>✓ 候补自动递补</span>
-        <span>✓ 预约全程可追溯</span>
-      </div>
+      <div class="intro-copy"><p class="eyebrow">SMART APPOINTMENT</p><h1>让号源调度<br>更有秩序。</h1><p>面向患者的便捷预约服务，和面向管理人员的可靠运营平台。</p></div>
+      <div class="intro-points"><span>✓ 号源实时调度</span><span>✓ 候补自动递补</span><span>✓ 预约全程可追溯</span></div>
     </section>
-
-    <section class="login-panel">
-      <div class="login-box">
-        <p class="eyebrow">WELCOME BACK</p>
-        <h2>登录智约医疗</h2>
-        <p class="login-subtitle">请选择您的身份后继续</p>
-        <div class="role-switch">
-          <button :class="{ active: role === 'PATIENT' }" type="button" @click="switchRole('PATIENT')">
-            <b>患者</b><small>预约、候补与就诊提醒</small>
-          </button>
-          <button :class="{ active: role === 'STAFF' }" type="button" @click="switchRole('STAFF')">
-            <b>工作人员</b><small>排班、号源与运营管理</small>
-          </button>
-        </div>
-        <form @submit.prevent="login">
+    <section class="login-panel"><div class="login-box">
+      <p class="eyebrow">WELCOME</p>
+      <h2>{{ mode === 'LOGIN' ? '登录智约医疗' : '注册患者账号' }}</h2>
+      <div class="auth-mode">
+        <button type="button" :class="{ active: mode === 'LOGIN' }" @click="switchMode('LOGIN')">登录</button>
+        <button type="button" :class="{ active: mode === 'REGISTER' }" @click="switchMode('REGISTER')">患者注册</button>
+      </div>
+      <form @submit.prevent="submit">
+        <template v-if="mode === 'LOGIN'">
+          <div class="role-switch">
+            <button :class="{ active: loginRole === 'PATIENT' }" type="button" @click="switchLoginRole('PATIENT')"><b>患者</b><small>预约与查看就诊记录</small></button>
+            <button :class="{ active: loginRole === 'STAFF' }" type="button" @click="switchLoginRole('STAFF')"><b>管理员</b><small>维护医生、排班与号源</small></button>
+          </div>
           <label>账号<input v-model.trim="account" autocomplete="username" placeholder="请输入账号" :disabled="loading"></label>
           <label>密码<input v-model="password" type="password" autocomplete="current-password" placeholder="请输入密码" :disabled="loading"></label>
-          <p v-if="error" class="form-error">{{ error }}</p>
-          <button class="login-submit" :disabled="loading">
-            {{ loading ? '登录中…' : `登录${role === 'PATIENT' ? '患者平台' : '运营平台'} →` }}
-          </button>
-        </form>
-        <p class="demo-hint">演示账号会在本地数据库初始化后可用，密码均为 123456</p>
-      </div>
-    </section>
+        </template>
+        <template v-else>
+          <label>姓名<input v-model.trim="registerForm.name" autocomplete="name" placeholder="请输入真实姓名" :disabled="loading"></label>
+          <label>账号<input v-model.trim="registerForm.username" autocomplete="username" placeholder="4 到 50 个字符" :disabled="loading"></label>
+          <label>手机号<input v-model.trim="registerForm.phone" autocomplete="tel" placeholder="请输入 11 位手机号" :disabled="loading"></label>
+          <label>性别<select v-model.number="registerForm.gender" :disabled="loading"><option :value="1">男</option><option :value="2">女</option></select></label>
+          <label>密码<input v-model="registerForm.password" type="password" autocomplete="new-password" placeholder="至少 6 个字符" :disabled="loading"></label>
+        </template>
+        <p v-if="error" class="form-error">{{ error }}</p><p v-if="notice" class="form-notice">{{ notice }}</p>
+        <button class="login-submit" :disabled="loading">{{ loading ? '提交中…' : mode === 'LOGIN' ? '登录 →' : '注册患者账号 →' }}</button>
+      </form>
+      <p v-if="mode === 'LOGIN'" class="demo-hint">演示账号密码均为 123456；管理员账号由管理端创建。</p>
+    </div></section>
   </main>
 </template>

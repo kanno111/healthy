@@ -32,11 +32,11 @@ public class GlobalExceptionHandler {
     }
     private HttpStatus toStatus(ErrorCode code) {
         return switch (code) {
-            case VALIDATION_ERROR -> HttpStatus.BAD_REQUEST;
+            case VALIDATION_ERROR, PATIENT_GENDER_REQUIRED -> HttpStatus.BAD_REQUEST;
             case UNAUTHORIZED, LOGIN_FAILED -> HttpStatus.UNAUTHORIZED;
             case FORBIDDEN -> HttpStatus.FORBIDDEN;
             case NOT_FOUND -> HttpStatus.NOT_FOUND;
-            case CONFLICT -> HttpStatus.CONFLICT;
+            case CONFLICT, USERNAME_EXISTS, PHONE_EXISTS -> HttpStatus.CONFLICT;
             case INTERNAL_ERROR -> HttpStatus.INTERNAL_SERVER_ERROR;
         };
     }

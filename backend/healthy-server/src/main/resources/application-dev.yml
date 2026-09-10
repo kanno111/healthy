@@ -11,6 +11,3 @@ spring:
       database: ${REDIS_DATABASE:3}
       password: ${REDIS_PASSWORD:}
       timeout: 2s
-logging:
-  level:
-    com.healthy.appointment.mapper: debug

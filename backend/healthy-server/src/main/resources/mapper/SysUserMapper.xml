@@ -10,4 +10,17 @@
           AND status = 1
         LIMIT 1
     </select>
+
+    <select id="existsByUsername" resultType="boolean">
+        SELECT EXISTS(SELECT 1 FROM sys_user WHERE username = #{username})
+    </select>
+
+    <select id="existsByPhone" resultType="boolean">
+        SELECT EXISTS(SELECT 1 FROM sys_user WHERE phone = #{phone})
+    </select>
+
+    <insert id="insert" useGeneratedKeys="true" keyProperty="user.id">
+        INSERT INTO sys_user (username, password_hash, name, phone, role, status)
+        VALUES (#{user.username}, #{user.passwordHash}, #{user.name}, #{user.phone}, #{user.role}, 1)
+    </insert>
 </mapper>
