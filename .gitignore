@@ -4,8 +4,9 @@
 Thumbs.db
 
 # Java / Maven
-backend/target/
+backend/**/target/
 backend/.env
+backend/**/application-local.yml
 
 # Node / Vite
 frontend/node_modules/
@@ -13,3 +14,6 @@ frontend/dist/
 frontend/verify-dist/
 frontend/*.tsbuildinfo
 
+# Nginx runtime files
+nginx/**/logs/
+nginx/**/temp/

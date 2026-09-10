@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.healthy.appointment.mapper.SysUserMapper">
+    <select id="findEnabledByUsername" resultType="com.healthy.appointment.entity.SysUser">
+        SELECT id, username, password_hash, name, phone, role, status, created_at, updated_at
+        FROM sys_user
+        WHERE username = #{username}
+          AND status = 1
+        LIMIT 1
+    </select>
+</mapper>

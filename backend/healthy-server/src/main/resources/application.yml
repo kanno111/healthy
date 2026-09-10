@@ -1,0 +1,19 @@
+spring:
+  application:
+    name: appointment-api
+  profiles:
+    default: local
+server:
+  port: ${SERVER_PORT:8080}
+  servlet:
+    context-path: /api
+mybatis:
+  mapper-locations: classpath*:mapper/**/*.xml
+  type-aliases-package: com.healthy.appointment.entity
+  configuration:
+    map-underscore-to-camel-case: true
+    default-enum-type-handler: org.apache.ibatis.type.EnumTypeHandler
+
+jwt:
+  secret: ${JWT_SECRET:healthy-appointment-local-development-secret-key-2026}
+  ttl: PT24H
