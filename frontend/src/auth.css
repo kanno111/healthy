@@ -1,0 +1,62 @@
+/* 登录与注册页：分段切换栏和表单控件 */
+.login-box {
+  padding: 8px;
+}
+
+.auth-mode {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 4px;
+  padding: 5px;
+  margin: 22px 0 24px;
+  border: 1px solid #e1e9e6;
+  border-radius: 12px;
+  background: #f3f7f5;
+}
+
+.auth-mode button {
+  min-height: 42px;
+  padding: 0 14px;
+  border-radius: 8px;
+  color: #718087;
+  background: transparent;
+  font-size: 14px;
+  font-weight: 600;
+  transition: background-color .18s ease, color .18s ease, box-shadow .18s ease;
+}
+
+.auth-mode button:hover {
+  color: #237d73;
+}
+
+.auth-mode button.active {
+  color: #176e65;
+  background: #fff;
+  box-shadow: 0 2px 8px rgba(31, 82, 75, .12);
+}
+
+.login-box select {
+  display: block;
+  width: 100%;
+  margin-top: 8px;
+  padding: 12px;
+  border: 1px solid #dce6e2;
+  border-radius: 7px;
+  outline-color: #2c9b8e;
+  color: #344b52;
+  background: #fff;
+  font: inherit;
+}
+
+.form-notice {
+  margin: 2px 0;
+  color: #238477;
+  font-size: 12px;
+  text-align: center;
+}
+
+@media (max-width: 760px) {
+  .login-box {
+    padding: 0;
+  }
+}

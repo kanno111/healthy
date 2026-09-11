@@ -1,0 +1,59 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.healthy.appointment.mapper.DepartmentMapper">
+    <sql id="departmentColumns">
+        d.id, d.name, d.description, d.sort_order, d.status, d.created_at, d.updated_at,
+        COUNT(doc.id) AS doctor_count
+    </sql>
+
+    <sql id="departmentJoinAndGroup">
+        FROM department d
+        LEFT JOIN doctor doc ON doc.department_id = d.id
+        GROUP BY d.id, d.name, d.description, d.sort_order, d.status, d.created_at, d.updated_at
+    </sql>
+
+    <select id="list" resultType="com.healthy.appointment.vo.DepartmentVO">
+        SELECT <include refid="departmentColumns"/>
+        FROM department d
+        LEFT JOIN doctor doc ON doc.department_id = d.id
+        <where>
+            <if test="name != null">AND d.name LIKE CONCAT('%', #{name}, '%')</if>
+            <if test="status != null">AND d.status = #{status}</if>
+        </where>
+        GROUP BY d.id, d.name, d.description, d.sort_order, d.status, d.created_at, d.updated_at
+        ORDER BY d.sort_order ASC, d.id ASC
+    </select>
+
+    <select id="findById" resultType="com.healthy.appointment.vo.DepartmentVO">
+        SELECT <include refid="departmentColumns"/>
+        FROM department d
+        LEFT JOIN doctor doc ON doc.department_id = d.id
+        WHERE d.id = #{id}
+        GROUP BY d.id, d.name, d.description, d.sort_order, d.status, d.created_at, d.updated_at
+    </select>
+
+    <select id="existsByName" resultType="boolean">
+        SELECT EXISTS(
+            SELECT 1 FROM department
+            WHERE name = #{name}
+            <if test="excludeId != null">AND id != #{excludeId}</if>
+        )
+    </select>
+
+    <insert id="insert" useGeneratedKeys="true" keyProperty="department.id">
+        INSERT INTO department (name, description, sort_order, status)
+        VALUES (#{department.name}, #{department.description}, #{department.sortOrder}, 1)
+    </insert>
+
+    <update id="update">
+        UPDATE department
+        SET name = #{department.name}, description = #{department.description}, sort_order = #{department.sortOrder}
+        WHERE id = #{department.id}
+    </update>
+
+    <update id="updateStatus">
+        UPDATE department SET status = #{status} WHERE id = #{id}
+    </update>
+</mapper>

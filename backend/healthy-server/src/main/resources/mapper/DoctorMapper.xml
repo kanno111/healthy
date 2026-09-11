@@ -1,0 +1,56 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.healthy.appointment.mapper.DoctorMapper">
+    <sql id="doctorColumns">
+        doc.id, doc.name, doc.gender, doc.department_id, dept.name AS department_name,
+        doc.doctor_code, doc.title, doc.introduction, doc.avatar_url, doc.sort_order,
+        doc.status, doc.created_at, doc.updated_at
+    </sql>
+
+    <select id="list" resultType="com.healthy.appointment.vo.DoctorVO">
+        SELECT <include refid="doctorColumns"/>
+        FROM doctor doc
+        INNER JOIN department dept ON dept.id = doc.department_id
+        <where>
+            <if test="name != null">AND doc.name LIKE CONCAT('%', #{name}, '%')</if>
+            <if test="departmentId != null">AND doc.department_id = #{departmentId}</if>
+            <if test="status != null">AND doc.status = #{status}</if>
+        </where>
+        ORDER BY doc.sort_order ASC, doc.id ASC
+    </select>
+
+    <select id="findById" resultType="com.healthy.appointment.vo.DoctorVO">
+        SELECT <include refid="doctorColumns"/>
+        FROM doctor doc
+        INNER JOIN department dept ON dept.id = doc.department_id
+        WHERE doc.id = #{id}
+    </select>
+
+    <select id="existsByDoctorCode" resultType="boolean">
+        SELECT EXISTS(
+            SELECT 1 FROM doctor
+            WHERE doctor_code = #{doctorCode}
+            <if test="excludeId != null">AND id != #{excludeId}</if>
+        )
+    </select>
+
+    <insert id="insert" useGeneratedKeys="true" keyProperty="doctor.id">
+        INSERT INTO doctor (name, gender, department_id, doctor_code, title, introduction, avatar_url, sort_order, status)
+        VALUES (#{doctor.name}, #{doctor.gender}, #{doctor.departmentId}, #{doctor.doctorCode}, #{doctor.title},
+                #{doctor.introduction}, #{doctor.avatarUrl}, #{doctor.sortOrder}, 1)
+    </insert>
+
+    <update id="update">
+        UPDATE doctor
+        SET name = #{doctor.name}, gender = #{doctor.gender}, department_id = #{doctor.departmentId},
+            doctor_code = #{doctor.doctorCode}, title = #{doctor.title}, introduction = #{doctor.introduction},
+            avatar_url = #{doctor.avatarUrl}, sort_order = #{doctor.sortOrder}
+        WHERE id = #{doctor.id}
+    </update>
+
+    <update id="updateStatus">
+        UPDATE doctor SET status = #{status} WHERE id = #{id}
+    </update>
+</mapper>
