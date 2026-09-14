@@ -1,12 +1,98 @@
 <script setup lang="ts">
-import { computed, ref } from 'vue'
+import { computed, onMounted, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { api } from '../api/mock'
-import type { Doctor, Slot } from '../types'
-const route = useRoute(); const router = useRouter(); const doctor = ref<Doctor>(); const loading = ref(false); const notice = ref('')
-api.getDoctor(route.params.id as string).then(v => doctor.value = v)
-const morning = computed(() => doctor.value?.slots.filter(s => s.period === '上午') ?? [])
-const afternoon = computed(() => doctor.value?.slots.filter(s => s.period === '下午') ?? [])
-async function choose(slot: Slot) { if (!doctor.value || loading.value) return; loading.value = true; notice.value = ''; try { if (slot.status === 'FULL') await api.waitlist(doctor.value, slot); else await api.reserve(doctor.value, slot); router.push('/appointments') } catch (e) { notice.value = e instanceof Error ? e.message : '预约失败，请重试' } finally { loading.value = false } }
+import { ApiError } from '../api/auth'
+import { patientResourceApi, type PatientDoctor, type PatientScheduleSlot } from '../api/patient-resource'
+import { session } from '../stores/session'
+
+const route = useRoute()
+const router = useRouter()
+const doctorId = Number(route.params.id)
+const doctor = ref<PatientDoctor | null>(null)
+const slots = ref<PatientScheduleSlot[]>([])
+const loading = ref(false)
+const errorMessage = ref('')
+
+function addDays(source: Date, days: number) {
+  const date = new Date(source)
+  date.setDate(date.getDate() + days)
+  return date
+}
+
+function formatDate(date: Date) {
+  const year = date.getFullYear()
+  const month = String(date.getMonth() + 1).padStart(2, '0')
+  const day = String(date.getDate()).padStart(2, '0')
+  return `${year}-${month}-${day}`
+}
+
+const startDate = new Date()
+startDate.setHours(0, 0, 0, 0)
+const endDate = addDays(startDate, 13)
+const dateTabs = Array.from({ length: 14 }, (_, index) => {
+  const date = addDays(startDate, index)
+  return {
+    value: formatDate(date),
+    dateText: `${date.getMonth() + 1}月${date.getDate()}日`,
+    weekday: `周${'日一二三四五六'[date.getDay()]}`
+  }
+})
+const selectedDate = ref(dateTabs[0].value)
+const selectedSlots = computed(() => slots.value.filter((slot) => slot.scheduleDate === selectedDate.value))
+
+async function loadDoctorResources() {
+  if (!session.token || !Number.isInteger(doctorId)) return
+  loading.value = true
+  errorMessage.value = ''
+  try {
+    const [doctorData, slotData] = await Promise.all([
+      patientResourceApi.getDoctor(session.token, doctorId),
+      patientResourceApi.listScheduleSlots(session.token, doctorId, formatDate(startDate), formatDate(endDate))
+    ])
+    doctor.value = doctorData
+    slots.value = slotData
+    selectedDate.value = slotData.find((slot) => slot.remainingCapacity > 0)?.scheduleDate ?? slotData[0]?.scheduleDate ?? dateTabs[0].value
+  } catch (error) {
+    errorMessage.value = error instanceof ApiError ? error.message : '医生和号源加载失败'
+  } finally { loading.value = false }
+}
+
+onMounted(loadDoctorResources)
+
+function goToConfirm(slot: PatientScheduleSlot) {
+  if (!doctor.value || slot.remainingCapacity < 1) return
+  void router.push({
+    path: '/appointment/confirm',
+    query: { doctorId: String(doctor.value.id), slotId: String(slot.id) }
+  })
+}
 </script>
-<template><div v-if="doctor" class="page-section"><p class="crumb">预约挂号 / {{ doctor.department }} / 医生详情</p><section class="doctor-hero"><div class="avatar large" :style="{ background: doctor.color }">{{ doctor.initials }}</div><div><p class="eyebrow">{{ doctor.department }}</p><h1>{{ doctor.name }} <span>{{ doctor.title }}</span></h1><p>{{ doctor.specialty }}</p><small>本平台仅提供预约服务，不涉及病历与诊疗信息。</small></div></section><section class="schedule"><div class="schedule-head"><div><p class="eyebrow">SCHEDULE</p><h2>选择就诊时段</h2></div><div class="date-tabs"><button class="active">9月10日<br><small>周四</small></button><button>9月11日<br><small>周五</small></button><button>9月12日<br><small>周六</small></button></div></div><p v-if="notice" class="alert">{{ notice }}</p><div v-for="group in [{ title: '上午', slots: morning }, { title: '下午', slots: afternoon }]" :key="group.title" class="slot-group"><h3>{{ group.title }}</h3><div v-for="slot in group.slots" :key="slot.id" class="slot"><div><b>{{ slot.time }}</b><p>普通门诊 · 挂号费 ¥{{ slot.fee }}</p></div><span :class="slot.status === 'AVAILABLE' ? 'available' : 'full'">{{ slot.status === 'AVAILABLE' ? `剩余 ${slot.remaining} 号` : '已约满' }}</span><button :class="slot.status === 'FULL' ? 'secondary' : ''" @click="choose(slot)" :disabled="loading">{{ slot.status === 'FULL' ? '加入候补' : (loading ? '提交中…' : '预约') }}</button></div></div><p class="tip">提交后将锁定号源 15 分钟，请在规定时间内完成模拟支付；号源余量以提交结果为准。</p></section></div></template>
+
+<template>
+  <div class="page-section patient-doctor-page">
+    <p class="crumb">预约挂号 / {{ doctor?.departmentName ?? '医生详情' }} / 查看号源</p>
+    <p v-if="errorMessage" class="alert">{{ errorMessage }}</p>
+    <div v-if="loading" class="patient-resource-loading">正在加载医生与号源…</div>
+    <template v-else-if="doctor">
+      <section class="doctor-hero">
+        <div class="avatar large">{{ doctor.name.slice(0, 1) }}</div>
+        <div><p class="eyebrow">{{ doctor.departmentName }}</p><h1>{{ doctor.name }} <span>{{ doctor.title || '医师' }}</span></h1><p>{{ doctor.introduction || '暂无医生简介' }}</p><small>以下号源来自医院排班，剩余数量以提交预约时为准。</small></div>
+      </section>
+      <section class="schedule patient-schedule">
+        <div class="schedule-head"><div><p class="eyebrow">SCHEDULE</p><h2>未来两周号源</h2></div></div>
+        <div class="date-tabs patient-date-tabs">
+          <button v-for="date in dateTabs" :key="date.value" :class="{ active: selectedDate === date.value }" @click="selectedDate = date.value">{{ date.dateText }}<br><small>{{ date.weekday }}</small></button>
+        </div>
+        <div v-if="selectedSlots.length" class="slot-group patient-slot-group">
+          <h3>{{ selectedDate }}</h3>
+          <div v-for="slot in selectedSlots" :key="slot.id" class="slot">
+            <div><b>{{ slot.sessionName }} · {{ slot.startTime.slice(0, 5) }}–{{ slot.endTime.slice(0, 5) }}</b><p>总号源 {{ slot.totalCapacity }}，当前剩余 {{ slot.remainingCapacity }}</p></div>
+            <span :class="slot.remainingCapacity > 0 ? 'available' : 'full'">{{ slot.remainingCapacity > 0 ? `剩余 ${slot.remainingCapacity} 号` : '已约满' }}</span>
+            <button :disabled="slot.remainingCapacity < 1" @click="goToConfirm(slot)">{{ slot.remainingCapacity > 0 ? '预约' : '已约满' }}</button>
+          </div>
+        </div>
+        <div v-else class="patient-slot-empty">当天暂无开放号源，请选择其他日期</div>
+      </section>
+    </template>
+  </div>
+</template>

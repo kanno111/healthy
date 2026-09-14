@@ -1,0 +1,96 @@
+.doctor-pagination {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-top: 16px;
+  color: #7c8c92;
+  font-size: 13px;
+}
+
+.doctor-pagination > div {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.doctor-pagination label {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+}
+
+.doctor-pagination select {
+  height: 32px;
+  padding: 0 8px;
+  border: 1px solid #cfe0dc;
+  border-radius: 7px;
+  background: #fff;
+  color: #40535b;
+  outline-color: #2c998c;
+}
+
+.doctor-pagination b {
+  color: #40535b;
+  font-weight: 600;
+}
+
+.doctor-pagination button {
+  padding: 7px 13px;
+  border: 1px solid #cfe0dc;
+  border-radius: 7px;
+  background: #fff;
+  color: #237e73;
+}
+
+.doctor-pagination button:disabled {
+  cursor: not-allowed;
+  opacity: .4;
+}
+
+.doctor-search-form {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.doctor-search-form .resource-search {
+  width: 230px;
+}
+
+.doctor-search-clear {
+  padding: 7px 5px;
+  background: transparent;
+  color: #77898f;
+  font-size: 12px;
+}
+
+.schedule-doctor-select:disabled {
+  cursor: not-allowed;
+  background: #f4f6f5;
+  color: #a1ada9;
+}
+
+.schedule-selection-empty {
+  margin-top: 18px;
+  border: 1px dashed #cfdfdb;
+  border-radius: 12px;
+  background: #fbfdfc;
+}
+
+@media (max-width: 760px) {
+  .doctor-pagination {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 10px;
+  }
+
+  .doctor-search-form {
+    width: 100%;
+    align-items: stretch;
+  }
+
+  .doctor-search-form .resource-search {
+    flex: 1;
+    width: auto;
+  }
+}

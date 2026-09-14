@@ -54,6 +54,14 @@
         WHERE id = #{id}
     </select>
 
+    <update id="decreaseRemainingCapacity">
+        UPDATE doctor_schedule_slot
+        SET remaining_capacity = remaining_capacity - 1
+        WHERE id = #{id}
+          AND status = 'OPEN'
+          AND remaining_capacity &gt; 0
+    </update>
+
     <update id="updateStatus">
         UPDATE doctor_schedule_slot
         SET status = #{status}, version = version + 1

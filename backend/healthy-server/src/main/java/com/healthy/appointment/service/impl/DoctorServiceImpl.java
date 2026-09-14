@@ -5,6 +5,7 @@ import com.healthy.appointment.entity.Doctor;
 import com.healthy.appointment.enumeration.ErrorCode;
 import com.healthy.appointment.exception.BusinessException;
 import com.healthy.appointment.mapper.DoctorMapper;
+import com.healthy.appointment.result.PageResult;
 import com.healthy.appointment.service.DepartmentService;
 import com.healthy.appointment.service.DoctorService;
 import com.healthy.appointment.vo.DepartmentVO;
@@ -24,6 +25,35 @@ public class DoctorServiceImpl implements DoctorService {
     public List<DoctorVO> list(String name, Long departmentId, Integer status) {
         validateStatusIfPresent(status);
         return doctorMapper.list(blankToNull(name), departmentId, status);
+    }
+
+    @Override
+    public PageResult<DoctorVO> page(String name, Long departmentId, Integer status, int page, int pageSize) {
+        validateStatusIfPresent(status);
+        return pageDoctors(blankToNull(name), null, departmentId, status, null, page, pageSize);
+    }
+
+    @Override
+    public PageResult<DoctorVO> pageVisible(Long departmentId, String keyword, int page, int pageSize) {
+        return pageDoctors(null, blankToNull(keyword), departmentId, 1, 1, page, pageSize);
+    }
+
+    private PageResult<DoctorVO> pageDoctors(
+            String name,
+            String keyword,
+            Long departmentId,
+            Integer status,
+            Integer departmentStatus,
+            int page,
+            int pageSize
+    ) {
+        validatePage(page, pageSize);
+        long total = doctorMapper.count(name, keyword, departmentId, status, departmentStatus);
+        long offset = (long) (page - 1) * pageSize;
+        List<DoctorVO> records = total == 0
+                ? List.of()
+                : doctorMapper.page(name, keyword, departmentId, status, departmentStatus, offset, pageSize);
+        return PageResult.of(records, total, page, pageSize);
     }
 
     @Override
@@ -88,6 +118,12 @@ public class DoctorServiceImpl implements DoctorService {
     private void validateStatusIfPresent(Integer status) {
         if (status != null) {
             validateStatus(status);
+        }
+    }
+
+    private void validatePage(int page, int pageSize) {
+        if (page < 1 || pageSize < 1 || pageSize > 100) {
+            throw new BusinessException(ErrorCode.VALIDATION_ERROR);
         }
     }
 

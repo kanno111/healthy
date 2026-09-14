@@ -20,13 +20,22 @@ const editingDepartment = ref<Department | null>(null)
 const savingDepartment = ref(false)
 const departmentForm = reactive({ name: '', description: '', sortOrder: 0 })
 const managedDoctors = ref<Doctor[]>([])
+const doctorPageRecords = ref<Doctor[]>([])
+const doctorPage = ref(1)
+const doctorPageSize = ref(10)
+const doctorTotal = ref(0)
+const doctorTotalPages = ref(0)
+const doctorKeyword = ref('')
+const appliedDoctorKeyword = ref('')
 const doctorError = ref('')
 const loadingDoctors = ref(false)
+const loadingDoctorPage = ref(false)
 const doctorModalVisible = ref(false)
 const editingDoctor = ref<Doctor | null>(null)
 const savingDoctor = ref(false)
 const doctorForm = reactive({ name: '', gender: 1, departmentId: 0, doctorCode: '', title: '', introduction: '', sortOrder: 0 })
 const scheduleSlots = ref<ScheduleSlot[]>([])
+const scheduleDepartmentId = ref(0)
 const scheduleDoctorId = ref(0)
 const loadingSchedule = ref(false)
 const scheduleError = ref('')
@@ -73,9 +82,6 @@ const scheduleSummary = computed(() => scheduleSlots.value.reduce((summary, slot
   booked: summary.booked + slot.bookedCapacity,
   remaining: summary.remaining + slot.remainingCapacity
 }), { total: 0, booked: 0, remaining: 0 }))
-const scheduleRows = computed(() => managedDoctors.value
-  .filter((doctor) => !scheduleDoctorId.value || doctor.id === scheduleDoctorId.value)
-  .map((doctor) => ({ doctor, slots: scheduleSlots.value.filter((slot) => slot.doctorId === doctor.id) })))
 const scheduleForm = reactive<ScheduleBatchPayload>({
   doctorId: 0,
   startDate: formatDate(weekStart.value),
@@ -114,17 +120,78 @@ async function loadDepartments() {
   finally { loadingDepartments.value = false }
 }
 
-async function loadDoctors() {
-  if (!session.token) return
+async function loadScheduleDoctors() {
+  if (!session.token || !scheduleDepartmentId.value) {
+    managedDoctors.value = []
+    loadingDoctors.value = false
+    return
+  }
+  const departmentId = scheduleDepartmentId.value
   loadingDoctors.value = true
   doctorError.value = ''
-  try { managedDoctors.value = await doctorApi.list(session.token) }
-  catch (error) { doctorError.value = error instanceof ApiError ? error.message : '医生数据加载失败' }
-  finally { loadingDoctors.value = false }
+  try {
+    const result = await doctorApi.list(session.token, {
+      page: 1,
+      pageSize: 100,
+      departmentId,
+      status: 1
+    })
+    if (scheduleDepartmentId.value === departmentId) managedDoctors.value = result.records
+  }
+  catch (error) {
+    if (scheduleDepartmentId.value === departmentId) {
+      doctorError.value = error instanceof ApiError ? error.message : '医生数据加载失败'
+    }
+  }
+  finally { if (scheduleDepartmentId.value === departmentId) loadingDoctors.value = false }
+}
+
+async function loadDoctorPage(page = doctorPage.value) {
+  if (!session.token) return
+  loadingDoctorPage.value = true
+  doctorError.value = ''
+  try {
+    const result = await doctorApi.list(session.token, {
+      page,
+      pageSize: doctorPageSize.value,
+      name: appliedDoctorKeyword.value || undefined
+    })
+    doctorPageRecords.value = result.records
+    doctorPage.value = result.page
+    doctorTotal.value = result.total
+    doctorTotalPages.value = result.totalPages
+  } catch (error) { doctorError.value = error instanceof ApiError ? error.message : '医生数据加载失败' }
+  finally { loadingDoctorPage.value = false }
+}
+
+function changeDoctorPage(page: number) {
+  if (page < 1 || page > doctorTotalPages.value || page === doctorPage.value) return
+  void loadDoctorPage(page)
+}
+
+function searchDoctors() {
+  appliedDoctorKeyword.value = doctorKeyword.value.trim()
+  doctorPage.value = 1
+  void loadDoctorPage(1)
+}
+
+function clearDoctorSearch() {
+  doctorKeyword.value = ''
+  appliedDoctorKeyword.value = ''
+  doctorPage.value = 1
+  void loadDoctorPage(1)
+}
+
+function changeDoctorPageSize() {
+  doctorPage.value = 1
+  void loadDoctorPage(1)
 }
 
 async function loadSchedule() {
-  if (!session.token) return
+  if (!session.token || !scheduleDoctorId.value) {
+    scheduleSlots.value = []
+    return
+  }
   loadingSchedule.value = true
   scheduleError.value = ''
   try {
@@ -132,24 +199,45 @@ async function loadSchedule() {
       session.token,
       formatDate(weekStart.value),
       formatDate(weekEnd.value),
-      scheduleDoctorId.value || undefined
+      scheduleDoctorId.value
     )
   } catch (error) { scheduleError.value = error instanceof ApiError ? error.message : '排班数据加载失败' }
   finally { loadingSchedule.value = false }
 }
 
 async function prepareSchedulePage() {
-  await Promise.all([loadDepartments(), loadDoctors()])
-  if (!scheduleDoctorId.value) scheduleDoctorId.value = managedDoctors.value.find((doctor) => doctor.status === 1)?.id ?? 0
+  await loadDepartments()
+  if (!scheduleDepartmentId.value) {
+    managedDoctors.value = []
+    scheduleDoctorId.value = 0
+    scheduleSlots.value = []
+    return
+  }
+  await loadScheduleDoctors()
+  if (!managedDoctors.value.some((doctor) => doctor.id === scheduleDoctorId.value)) {
+    scheduleDoctorId.value = 0
+    scheduleSlots.value = []
+    return
+  }
   await loadSchedule()
+}
+
+async function changeScheduleDepartment() {
+  scheduleDoctorId.value = 0
+  scheduleSlots.value = []
+  selectedScheduleSlot.value = null
+  scheduleMessage.value = ''
+  await loadScheduleDoctors()
+}
+
+function changeScheduleDoctor() {
+  scheduleSlots.value = []
+  selectedScheduleSlot.value = null
+  void loadSchedule()
 }
 
 function slotsForDay(date: string) {
   return scheduleSlots.value.filter((slot) => slot.scheduleDate === date)
-}
-
-function slotsForDoctorDay(slots: ScheduleSlot[], date: string) {
-  return slots.filter((slot) => slot.scheduleDate === date)
 }
 
 function capacityPercent(slot: ScheduleSlot) {
@@ -166,7 +254,7 @@ function newSession(sessionType: ScheduleSessionType = 'MORNING', startTime = '0
 }
 
 function openBatchSchedule() {
-  scheduleForm.doctorId = scheduleDoctorId.value || managedDoctors.value.find((doctor) => doctor.status === 1)?.id || 0
+  scheduleForm.doctorId = scheduleDoctorId.value
   scheduleForm.startDate = formatDate(weekStart.value)
   scheduleForm.endDate = formatDate(weekEnd.value)
   scheduleForm.weekdays = [1, 2, 3, 4, 5]
@@ -257,9 +345,10 @@ async function saveDoctor() {
   savingDoctor.value = true; doctorError.value = ''
   const payload = { ...doctorForm, title: doctorForm.title || undefined, introduction: doctorForm.introduction || undefined, sortOrder: Number(doctorForm.sortOrder) }
   try {
-    const id = editingDoctor.value ? (await doctorApi.update(session.token, editingDoctor.value.id, payload), editingDoctor.value.id) : await doctorApi.create(session.token, payload)
-    const saved = await doctorApi.getById(session.token, id)
-    managedDoctors.value = [...managedDoctors.value.filter((doctor) => doctor.id !== id), saved].sort((a, b) => a.sortOrder - b.sortOrder || a.id - b.id)
+    if (editingDoctor.value) await doctorApi.update(session.token, editingDoctor.value.id, payload)
+    else await doctorApi.create(session.token, payload)
+    if (!editingDoctor.value) doctorPage.value = 1
+    await loadDoctorPage(doctorPage.value)
     doctorModalVisible.value = false
   } catch (error) { doctorError.value = error instanceof ApiError ? error.message : '医生保存失败' }
   finally { savingDoctor.value = false }
@@ -268,7 +357,11 @@ async function saveDoctor() {
 async function toggleDoctorStatus(doctor: Doctor) {
   if (!session.token) return
   const status = doctor.status === 1 ? 0 : 1
-  try { await doctorApi.updateStatus(session.token, doctor.id, status); managedDoctors.value = managedDoctors.value.map((item) => item.id === doctor.id ? { ...item, status } : item) }
+  try {
+    await doctorApi.updateStatus(session.token, doctor.id, status)
+    doctorPageRecords.value = doctorPageRecords.value.map((item) => item.id === doctor.id ? { ...item, status } : item)
+    managedDoctors.value = managedDoctors.value.map((item) => item.id === doctor.id ? { ...item, status } : item)
+  }
   catch (error) { doctorError.value = error instanceof ApiError ? error.message : '医生状态更新失败' }
 }
 
@@ -323,10 +416,10 @@ function logout() {
 }
 
 watch(active, (value) => {
-  if (value === 'resource') { void loadDepartments(); void loadDoctors() }
+  if (value === 'resource') { void loadDepartments(); if (resourceTab.value === 'doctors') void loadDoctorPage() }
   if (value === 'schedule') void prepareSchedulePage()
 })
-watch(resourceTab, (value) => { if (value === 'doctors') void loadDoctors() })
+watch(resourceTab, (value) => { if (value === 'doctors') void loadDoctorPage() })
 onMounted(() => { if (active.value === 'resource') void loadDepartments() })
 </script>
 
@@ -340,17 +433,22 @@ onMounted(() => { if (active.value === 'resource') void loadDepartments() })
         <div class="resource-toolbar"><div class="resource-tabs"><button :class="{ active: resourceTab === 'departments' }" @click="resourceTab = 'departments'">科室管理</button><button :class="{ active: resourceTab === 'doctors' }" @click="resourceTab = 'doctors'">医生管理</button></div><button class="primary resource-create" @click="resourceTab === 'departments' ? openCreateDepartment() : openCreateDoctor()">+ {{ resourceTab === 'departments' ? '新建科室' : '新增医生' }}</button></div>
         <template v-if="resourceTab === 'departments'"><div class="resource-intro"><div><h2>科室列表</h2><p>维护患者端可见的科室及其启用状态。</p></div><label class="resource-search">⌕ <input v-model.trim="departmentKeyword" placeholder="搜索科室名称"></label></div><p v-if="departmentError" class="resource-error">{{ departmentError }}</p><div v-if="loadingDepartments" class="resource-empty">正在加载科室数据…</div><div v-else-if="filteredDepartments.length" class="department-admin-grid"><article v-for="department in filteredDepartments" :key="department.id" class="department-admin-card"><div class="department-admin-icon">科</div><div><h3>{{ department.name }}</h3><p>已关联 {{ department.doctorCount }} 位医生</p></div><button class="status-chip status-button" @click="toggleDepartmentStatus(department)">{{ department.status === 1 ? '启用' : '停用' }}</button><button class="more-button" aria-label="编辑科室" title="编辑科室" @click="openEditDepartment(department)">⋯</button></article></div><div v-else class="resource-empty">还没有科室，点击右上角新建第一个科室。</div></template>
         <template v-else>
-          <div class="resource-intro"><div><h2>医生列表</h2><p>维护医生资料、所属科室与出诊状态。</p></div></div>
+          <div class="resource-intro"><div><h2>医生列表</h2><p>维护医生资料、所属科室与出诊状态。</p></div><form class="doctor-search-form" @submit.prevent="searchDoctors"><label class="resource-search">⌕ <input v-model="doctorKeyword" type="search" placeholder="搜索医生姓名"></label><button class="table-action" type="submit">搜索</button><button v-if="doctorKeyword || appliedDoctorKeyword" class="doctor-search-clear" type="button" @click="clearDoctorSearch">清空</button></form></div>
           <p v-if="doctorError" class="resource-error">{{ doctorError }}</p>
-          <div v-if="loadingDoctors" class="resource-empty">正在加载医生数据…</div>
-          <section v-else-if="managedDoctors.length" class="doctor-admin-table"><table><thead><tr><th>医生</th><th>所属科室</th><th>职称</th><th>工号</th><th>状态</th><th></th></tr></thead><tbody><tr v-for="doctor in managedDoctors" :key="doctor.id"><td><b>{{ doctor.name }}</b></td><td>{{ doctor.departmentName }}</td><td>{{ doctor.title || '-' }}</td><td>{{ doctor.doctorCode }}</td><td><button class="status-chip status-button" @click="toggleDoctorStatus(doctor)">{{ doctor.status === 1 ? '启用' : '停用' }}</button></td><td><button class="table-action" @click="openEditDoctor(doctor)">编辑</button></td></tr></tbody></table></section>
-          <div v-else class="resource-empty">还没有医生，请先创建启用的科室，再新增医生。</div>
+          <div v-if="loadingDoctorPage" class="resource-empty">正在加载医生数据…</div>
+          <section v-else-if="doctorPageRecords.length" class="doctor-admin-table"><table><thead><tr><th>医生</th><th>所属科室</th><th>职称</th><th>工号</th><th>状态</th><th></th></tr></thead><tbody><tr v-for="doctor in doctorPageRecords" :key="doctor.id"><td><b>{{ doctor.name }}</b></td><td>{{ doctor.departmentName }}</td><td>{{ doctor.title || '-' }}</td><td>{{ doctor.doctorCode }}</td><td><button class="status-chip status-button" @click="toggleDoctorStatus(doctor)">{{ doctor.status === 1 ? '启用' : '停用' }}</button></td><td><button class="table-action" @click="openEditDoctor(doctor)">编辑</button></td></tr></tbody></table></section>
+          <div v-if="doctorTotal > 0" class="doctor-pagination"><label>每页<select v-model.number="doctorPageSize" @change="changeDoctorPageSize"><option :value="10">10 条</option><option :value="20">20 条</option><option :value="50">50 条</option></select></label><span>共 {{ doctorTotal }} 位医生</span><div><button :disabled="doctorPage === 1" @click="changeDoctorPage(doctorPage - 1)">上一页</button><b>第 {{ doctorPage }} / {{ doctorTotalPages }} 页</b><button :disabled="doctorPage === doctorTotalPages" @click="changeDoctorPage(doctorPage + 1)">下一页</button></div></div>
+          <div v-if="!loadingDoctorPage && !doctorPageRecords.length" class="resource-empty">没有找到符合条件的医生。</div>
         </template>
       </section>
       <section v-else-if="active === 'schedule'" class="schedule-page">
         <div class="schedule-toolbar">
-          <select v-model.number="scheduleDoctorId" class="schedule-doctor-select" @change="loadSchedule">
-            <option :value="0">全部医生</option>
+          <select v-model.number="scheduleDepartmentId" class="schedule-doctor-select" @change="changeScheduleDepartment">
+            <option :value="0">请选择科室</option>
+            <option v-for="department in enabledDepartments" :key="department.id" :value="department.id">{{ department.name }}</option>
+          </select>
+          <select v-model.number="scheduleDoctorId" class="schedule-doctor-select" :disabled="!scheduleDepartmentId || loadingDoctors" @change="changeScheduleDoctor">
+            <option :value="0">{{ loadingDoctors ? '正在加载医生…' : '请选择医生' }}</option>
             <option v-for="doctor in managedDoctors" :key="doctor.id" :value="doctor.id">{{ doctor.name }} · {{ doctor.departmentName }}</option>
           </select>
           <div class="schedule-controls">
@@ -358,7 +456,7 @@ onMounted(() => { if (active.value === 'resource') void loadDepartments() })
             <span class="week-title">{{ weekTitle }}</span>
             <button title="下一周" @click="changeWeek(1)">›</button>
           </div>
-          <button class="primary resource-create" :disabled="!managedDoctors.length" @click="openBatchSchedule">+ 批量排班</button>
+          <button class="primary resource-create" :disabled="!scheduleDoctorId" @click="openBatchSchedule">+ 批量排班</button>
         </div>
         <div class="schedule-summary">
           <article><small>本周总号源</small><strong>{{ scheduleSummary.total }}</strong></article>
@@ -384,22 +482,7 @@ onMounted(() => { if (active.value === 'resource') void loadDepartments() })
             </div>
           </section>
         </div>
-        <div v-else class="schedule-matrix-wrap">
-          <table class="schedule-matrix">
-            <thead><tr><th class="doctor-column">医生</th><th v-for="day in weekDays" :key="day.date"><b>周{{ day.label }}</b><small>{{ day.text }}</small></th></tr></thead>
-            <tbody>
-              <tr v-for="row in scheduleRows" :key="row.doctor.id">
-                <td class="matrix-doctor"><b>{{ row.doctor.name }}</b><small>{{ row.doctor.departmentName }} · {{ row.doctor.title || '医师' }}</small></td>
-                <td v-for="day in weekDays" :key="day.date" class="matrix-cell">
-                  <button v-for="slot in slotsForDoctorDay(row.slots, day.date)" :key="slot.id" class="matrix-slot" :class="[slot.status.toLowerCase(), slot.remainingCapacity === 0 ? 'full' : '']" @click="selectedScheduleSlot = slot">
-                    <span>{{ slot.sessionName }}</span><strong>{{ slot.status === 'CLOSED' ? '关闭' : slot.remainingCapacity === 0 ? '已满' : `余${slot.remainingCapacity}` }}</strong>
-                  </button>
-                  <span v-if="!slotsForDoctorDay(row.slots, day.date).length" class="matrix-empty">—</span>
-                </td>
-              </tr>
-            </tbody>
-          </table>
-        </div>
+        <div v-else class="resource-empty schedule-selection-empty">请先选择科室，再选择需要排班的医生。</div>
       </section>
       <section v-else class="panel module-placeholder"><div class="module-icon">{{ menus.find((item) => item.id === active)?.icon }}</div><h2>{{ menus.find((item) => item.id === active)?.label }}</h2><p>该模块将在预约核心链路完成后接入对应的管理接口与业务规则。</p></section>
     </main>

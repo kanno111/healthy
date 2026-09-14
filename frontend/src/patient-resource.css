@@ -1,0 +1,26 @@
+.patient-resource-error { margin: 18px 0 0; }
+.patient-resource-loading { display: grid; min-height: 320px; place-items: center; color: #849399; }
+.patient-doctor-page .doctor-hero .avatar { background: linear-gradient(135deg, #31998d, #236e69); }
+.patient-schedule { overflow: hidden; }
+.patient-date-tabs { display: flex; gap: 7px; margin-top: 24px; overflow-x: auto; padding-bottom: 7px; }
+.patient-date-tabs button { flex: 0 0 94px; line-height: 1.45; }
+.patient-date-tabs small { color: inherit; opacity: .72; }
+.patient-slot-group { margin-top: 20px; }
+.patient-slot-group .slot button:disabled { cursor: not-allowed; background: #b5c5c2; }
+.patient-slot-empty { display: grid; min-height: 180px; place-items: center; margin-top: 18px; border: 1px dashed #cfddda; border-radius: 10px; color: #8b989d; font-size: 13px; }
+.patient-pagination { display: flex; align-items: center; justify-content: space-between; gap: 16px; margin-top: 22px; color: #718187; font-size: 13px; }
+.patient-pagination label, .patient-pagination > div { display: flex; align-items: center; gap: 8px; }
+.patient-pagination select, .patient-pagination button { height: 34px; border: 1px solid #d6e4e0; border-radius: 7px; background: #fff; color: #52666c; }
+.patient-pagination select { padding: 0 9px; outline-color: #2c998c; }
+.patient-pagination button { min-width: 34px; padding: 0 10px; }
+.patient-pagination button.active { border-color: #288f83; background: #288f83; color: #fff; }
+.patient-pagination button:disabled { cursor: not-allowed; opacity: .4; }
+
+@media (max-width: 760px) {
+  .patient-date-tabs { display: flex; }
+  .patient-date-tabs button { flex-basis: 84px; padding: 8px 10px; }
+  .patient-slot-group .slot { flex-wrap: wrap; }
+  .patient-slot-group .slot button { width: 100%; }
+  .patient-pagination { align-items: flex-start; flex-direction: column; }
+  .patient-pagination > div { max-width: 100%; overflow-x: auto; padding-bottom: 4px; }
+}

@@ -5,4 +5,6 @@ import org.apache.ibatis.annotations.Param;
 
 public interface PatientMapper {
     int insert(@Param("patient") Patient patient);
+
+    Long findEnabledIdByUserId(@Param("userId") Long userId);
 }

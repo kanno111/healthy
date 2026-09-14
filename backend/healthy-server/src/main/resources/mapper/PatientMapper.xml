@@ -7,4 +7,12 @@
         INSERT INTO patient (user_id, real_name, gender)
         VALUES (#{patient.userId}, #{patient.realName}, #{patient.gender})
     </insert>
+
+    <select id="findEnabledIdByUserId" resultType="java.lang.Long">
+        SELECT id
+        FROM patient
+        WHERE user_id = #{userId}
+          AND status = 1
+        LIMIT 1
+    </select>
 </mapper>

@@ -6,11 +6,14 @@ import com.healthy.appointment.exception.BusinessException;
 import com.healthy.appointment.mapper.DoctorMapper;
 import com.healthy.appointment.service.impl.DoctorServiceImpl;
 import com.healthy.appointment.vo.DepartmentVO;
+import com.healthy.appointment.vo.DoctorVO;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+
+import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -71,6 +74,32 @@ class DoctorServiceImplTest {
 
         assertThatThrownBy(() -> service.updateStatus(1L, 2))
                 .isInstanceOf(BusinessException.class);
+    }
+
+    @Test
+    void pageCalculatesOffsetAndTotalPages() {
+        DoctorService service = new DoctorServiceImpl(doctorMapper, departmentService);
+        DoctorVO doctor = new DoctorVO();
+        doctor.setId(11L);
+        when(doctorMapper.count("张", null, 1L, 1, null)).thenReturn(21L);
+        when(doctorMapper.page("张", null, 1L, 1, null, 10L, 10)).thenReturn(List.of(doctor));
+
+        var result = service.page(" 张 ", 1L, 1, 2, 10);
+
+        assertThat(result.records()).containsExactly(doctor);
+        assertThat(result.total()).isEqualTo(21L);
+        assertThat(result.totalPages()).isEqualTo(3L);
+        assertThat(result.page()).isEqualTo(2);
+    }
+
+    @Test
+    void pageVisibleRestrictsDoctorAndDepartmentStatus() {
+        DoctorService service = new DoctorServiceImpl(doctorMapper, departmentService);
+        when(doctorMapper.count(null, "心血管", 1L, 1, 1)).thenReturn(0L);
+
+        service.pageVisible(1L, " 心血管 ", 1, 10);
+
+        verify(doctorMapper).count(null, "心血管", 1L, 1, 1);
     }
 
     private DoctorSaveDTO request() {

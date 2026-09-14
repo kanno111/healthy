@@ -1,0 +1,42 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.healthy.appointment.mapper.AppointmentMapper">
+    <sql id="patientAppointmentColumns">
+        appointment.id, appointment.appointment_no, appointment.doctor_id,
+        doctor.name AS doctor_name, doctor.department_id, department.name AS department_name,
+        appointment.schedule_slot_id, appointment.schedule_date, slot.session_name,
+        appointment.start_time, appointment.end_time, appointment.status, appointment.created_at
+    </sql>
+
+    <insert id="insert" useGeneratedKeys="true" keyProperty="appointment.id">
+        INSERT INTO appointment (
+            appointment_no, patient_id, doctor_id, schedule_slot_id,
+            schedule_date, start_time, end_time, status
+        ) VALUES (
+            #{appointment.appointmentNo}, #{appointment.patientId}, #{appointment.doctorId}, #{appointment.scheduleSlotId},
+            #{appointment.scheduleDate}, #{appointment.startTime}, #{appointment.endTime}, #{appointment.status}
+        )
+    </insert>
+
+    <select id="findByIdAndPatientId" resultType="com.healthy.appointment.vo.PatientAppointmentVO">
+        SELECT <include refid="patientAppointmentColumns"/>
+        FROM appointment
+        INNER JOIN doctor ON doctor.id = appointment.doctor_id
+        INNER JOIN department ON department.id = doctor.department_id
+        LEFT JOIN doctor_schedule_slot slot ON slot.id = appointment.schedule_slot_id
+        WHERE appointment.id = #{id}
+          AND appointment.patient_id = #{patientId}
+    </select>
+
+    <select id="listByPatientId" resultType="com.healthy.appointment.vo.PatientAppointmentVO">
+        SELECT <include refid="patientAppointmentColumns"/>
+        FROM appointment
+        INNER JOIN doctor ON doctor.id = appointment.doctor_id
+        INNER JOIN department ON department.id = doctor.department_id
+        LEFT JOIN doctor_schedule_slot slot ON slot.id = appointment.schedule_slot_id
+        WHERE appointment.patient_id = #{patientId}
+        ORDER BY appointment.created_at DESC, appointment.id DESC
+    </select>
+</mapper>

@@ -2,6 +2,7 @@ package com.healthy.appointment.controller.admin;
 
 import com.healthy.appointment.dto.DoctorSaveDTO;
 import com.healthy.appointment.result.ApiResponse;
+import com.healthy.appointment.result.PageResult;
 import com.healthy.appointment.service.DoctorService;
 import com.healthy.appointment.vo.DoctorVO;
 import jakarta.validation.Valid;
@@ -16,8 +17,6 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
-import java.util.List;
-
 @RestController
 @RequestMapping("/admin/doctors")
 @RequiredArgsConstructor
@@ -25,13 +24,15 @@ public class DoctorController {
     private final DoctorService doctorService;
 
     @GetMapping
-    /** 查询医生列表，可按姓名、所属科室和启停状态筛选。 */
-    public ApiResponse<List<DoctorVO>> list(
+    /** 分页查询医生，可按姓名、所属科室和启停状态筛选。 */
+    public ApiResponse<PageResult<DoctorVO>> page(
             @RequestParam(required = false) String name,
             @RequestParam(required = false) Long departmentId,
-            @RequestParam(required = false) Integer status
+            @RequestParam(required = false) Integer status,
+            @RequestParam int page,
+            @RequestParam int pageSize
     ) {
-        return ApiResponse.success(doctorService.list(name, departmentId, status));
+        return ApiResponse.success(doctorService.page(name, departmentId, status, page, pageSize));
     }
 
     @GetMapping("/{id}")

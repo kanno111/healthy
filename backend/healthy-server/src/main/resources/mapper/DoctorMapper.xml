@@ -9,16 +9,51 @@
         doc.status, doc.created_at, doc.updated_at
     </sql>
 
-    <select id="list" resultType="com.healthy.appointment.vo.DoctorVO">
-        SELECT <include refid="doctorColumns"/>
-        FROM doctor doc
-        INNER JOIN department dept ON dept.id = doc.department_id
+    <sql id="doctorConditions">
         <where>
             <if test="name != null">AND doc.name LIKE CONCAT('%', #{name}, '%')</if>
             <if test="departmentId != null">AND doc.department_id = #{departmentId}</if>
             <if test="status != null">AND doc.status = #{status}</if>
         </where>
+    </sql>
+
+    <sql id="doctorPageConditions">
+        <where>
+            <if test="name != null">AND doc.name LIKE CONCAT('%', #{name}, '%')</if>
+            <if test="keyword != null">
+                AND (doc.name LIKE CONCAT('%', #{keyword}, '%')
+                     OR dept.name LIKE CONCAT('%', #{keyword}, '%')
+                     OR doc.title LIKE CONCAT('%', #{keyword}, '%')
+                     OR doc.introduction LIKE CONCAT('%', #{keyword}, '%'))
+            </if>
+            <if test="departmentId != null">AND doc.department_id = #{departmentId}</if>
+            <if test="status != null">AND doc.status = #{status}</if>
+            <if test="departmentStatus != null">AND dept.status = #{departmentStatus}</if>
+        </where>
+    </sql>
+
+    <select id="list" resultType="com.healthy.appointment.vo.DoctorVO">
+        SELECT <include refid="doctorColumns"/>
+        FROM doctor doc
+        INNER JOIN department dept ON dept.id = doc.department_id
+        <include refid="doctorConditions"/>
         ORDER BY doc.sort_order ASC, doc.id ASC
+    </select>
+
+    <select id="count" resultType="long">
+        SELECT COUNT(*)
+        FROM doctor doc
+        INNER JOIN department dept ON dept.id = doc.department_id
+        <include refid="doctorPageConditions"/>
+    </select>
+
+    <select id="page" resultType="com.healthy.appointment.vo.DoctorVO">
+        SELECT <include refid="doctorColumns"/>
+        FROM doctor doc
+        INNER JOIN department dept ON dept.id = doc.department_id
+        <include refid="doctorPageConditions"/>
+        ORDER BY doc.sort_order ASC, doc.id ASC
+        LIMIT #{offset}, #{pageSize}
     </select>
 
     <select id="findById" resultType="com.healthy.appointment.vo.DoctorVO">

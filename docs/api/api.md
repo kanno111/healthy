@@ -103,9 +103,19 @@ Authorization: Bearer <token>
 
 以下接口均要求管理员在请求头携带有效 Token。
 
-### `GET /api/admin/doctors`
+### `GET /api/admin/doctors?page=1&pageSize=10`
 
-查询医生列表。可选查询参数：`name`（姓名模糊查询）、`departmentId`（所属科室）、`status`（`1` 启用，`0` 停用）。
+分页查询医生。前端必须传入 `page` 和 `pageSize`，其中 `page` 从 `1` 开始、`pageSize` 最大为 `100`；可选查询参数：`name`（姓名模糊查询）、`departmentId`（所属科室）、`status`（`1` 启用，`0` 停用）。返回字段如下：
+
+```json
+{
+  "records": [],
+  "total": 30,
+  "page": 1,
+  "pageSize": 10,
+  "totalPages": 3
+}
+```
 
 ### `GET /api/admin/doctors/{id}`
 
@@ -185,3 +195,23 @@ Authorization: Bearer <token>
 ### `PATCH /api/admin/schedule-slots/{id}/capacity?capacity=35`
 
 调整班次总号源。新容量不能小于当前已预约人数，调整后剩余号源会按差额自动重新计算。
+
+## 8. 患者端科室、医生与号源
+
+以下接口要求患者请求头携带有效 Token，管理员账号不能调用。
+
+### `GET /api/user/departments`
+
+查询所有已启用科室，仅返回 `id`、`name` 和 `description`。
+
+### `GET /api/user/doctors?page=1&pageSize=10&departmentId=1&keyword=心血管`
+
+分页查询已启用科室下的已启用医生。前端必须传入 `page` 和 `pageSize`，其中 `page` 从 `1` 开始、`pageSize` 最大为 `100`；`departmentId` 和 `keyword` 均可不传，关键词匹配医生姓名、科室、职称和简介。返回结构与管理端医生分页一致，其中 `records` 只包含患者可见的公开资料和 `hasAvailableSlots`，不会返回医生工号等管理字段。
+
+### `GET /api/user/doctors/{id}`
+
+查询患者可见的医生详情；医生或所属科室停用后返回资源不存在。
+
+### `GET /api/user/doctors/{id}/schedule-slots?startDate=2026-09-14&endDate=2026-09-27`
+
+查询医生指定日期范围内状态为 `OPEN` 的班次，包括班次名称、起止时间、总号源和剩余号源。开始日期不能早于当天，一次最多查询 14 天；剩余为 0 的开放班次仍会返回并展示“已约满”。
