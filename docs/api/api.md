@@ -135,3 +135,53 @@ Authorization: Bearer <token>
 ### `PATCH /api/admin/doctors/{id}/status?status=0`
 
 停用医生；传入 `status=1` 可重新启用。停用不会删除该医生的历史排班与预约记录。
+
+## 7. 管理端批量排班放号
+
+以下接口要求管理员在请求头携带有效 Token。
+
+### `POST /api/admin/schedule-slots/batch`
+
+按日期范围、指定星期和一个或多个连续出诊班次，生成可预约号源。一个 `session` 对应一条号源池记录，例如“上午门诊”或“下午门诊”。只要医生不存在或停用、参数不合法、同一次请求中时段重叠、或与已有排班冲突，整批号源均不会写入。
+
+```json
+{
+  "doctorId": 1,
+  "startDate": "2026-09-14",
+  "endDate": "2026-09-18",
+  "weekdays": [1, 2, 3, 4, 5],
+  "sessions": [
+    { "sessionType": "MORNING", "startTime": "08:00", "endTime": "12:00", "capacity": 30, "averageConsultationMinutes": 8 },
+    { "sessionType": "AFTERNOON", "startTime": "14:00", "endTime": "17:00", "capacity": 20, "averageConsultationMinutes": 9 }
+  ]
+}
+```
+
+字段说明：`weekdays` 使用 ISO 星期值，`1` 为周一、`7` 为周日；日期范围不能早于当天，最长 31 天；`sessionType` 只能是 `MORNING`、`AFTERNOON`、`OTHER`，前两种名称固定，只有 `OTHER` 需要额外传 `customSessionName`；`capacity` 是整个班次的总号源；`averageConsultationMinutes` 用于患者预约成功后计算预计到诊时间。班次总号源乘以平均接诊时长不能超过班次总时长。
+
+成功响应示例：
+
+```json
+{
+  "code": 0,
+  "message": "success",
+  "data": {
+    "createdCount": 10,
+    "slots": [
+      { "doctorId": 1, "scheduleDate": "2026-09-14", "sessionType": "MORNING", "sessionName": "上午门诊", "startTime": "08:00:00", "endTime": "12:00:00", "averageConsultationMinutes": 8, "totalCapacity": 30, "bookedCapacity": 0, "remainingCapacity": 30, "status": "OPEN" }
+    ]
+  }
+}
+```
+
+### `GET /api/admin/schedule-slots?doctorId=1&startDate=2026-09-14&endDate=2026-09-20`
+
+查询日期范围内的排班。`doctorId` 可不传，起止日期必传且范围最长 31 天。返回医生、科室、班次、总号源、已预约和剩余号源。
+
+### `PATCH /api/admin/schedule-slots/{id}/status?status=CLOSED`
+
+关闭班次；传入 `OPEN` 可重新开放。接口使用版本号避免并发修改互相覆盖。
+
+### `PATCH /api/admin/schedule-slots/{id}/capacity?capacity=35`
+
+调整班次总号源。新容量不能小于当前已预约人数，调整后剩余号源会按差额自动重新计算。

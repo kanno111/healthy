@@ -6,5 +6,7 @@ import './auth.css'
 import './department.css'
 import './admin-resource.css'
 import './admin-department-modal.css'
+import './admin-schedule.css'
+import './admin-schedule-matrix.css'
 
 createApp(App).use(router).mount('#app')

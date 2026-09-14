@@ -1,0 +1,38 @@
+.schedule-matrix-wrap {
+  overflow: auto;
+  border: 1px solid #dfe8e5;
+  border-radius: 12px;
+  background: #fff;
+}
+.schedule-matrix { min-width: 1050px; table-layout: fixed; }
+.schedule-matrix th, .schedule-matrix td { padding: 12px 9px; border-right: 1px solid #edf1ef; vertical-align: top; }
+.schedule-matrix th { background: #fafcfb; }
+.schedule-matrix th b, .schedule-matrix th small { display: block; }
+.schedule-matrix th small { margin-top: 4px; color: #8a979c; font-size: 10px; }
+.schedule-matrix .doctor-column { width: 165px; }
+.matrix-doctor { position: sticky; left: 0; z-index: 1; background: #fff; }
+.matrix-doctor b, .matrix-doctor small { display: block; }
+.matrix-doctor b { color: #213a42; font-size: 13px; }
+.matrix-doctor small { margin-top: 5px; color: #88969b; font-size: 10px; }
+.matrix-cell { height: 76px; }
+.matrix-slot { display: flex; width: 100%; align-items: center; justify-content: space-between; gap: 5px; margin-bottom: 5px; padding: 7px 8px; border-radius: 6px; background: #e8f6f2; color: #276f68; font-size: 10px; }
+.matrix-slot span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.matrix-slot strong { flex: none; font-size: 10px; }
+.matrix-slot.closed { background: #eff1f1; color: #7d898d; }
+.matrix-slot.full { background: #faece8; color: #b8614c; }
+.matrix-empty { display: block; padding-top: 10px; text-align: center; color: #b2babc; }
+.schedule-detail-mask { justify-items: end; }
+.schedule-detail { width: min(390px, 100%); height: 100%; border-radius: 14px 0 0 14px; }
+.detail-date { display: flex; justify-content: space-between; padding: 13px; border-radius: 8px; background: #f1f7f5; color: #315f59; font-size: 13px; }
+.detail-capacity { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin-top: 16px; }
+.detail-capacity article { padding: 13px; border: 1px solid #e2ebe8; border-radius: 8px; }
+.detail-capacity small, .detail-capacity strong { display: block; }
+.detail-capacity small { color: #879499; font-size: 11px; }
+.detail-capacity strong { margin-top: 5px; font-size: 22px; }
+.detail-note { margin-top: 16px; color: #7a898e; font-size: 12px; line-height: 1.7; }
+.session-editor-fields select { padding: 8px; }
+
+@media (max-width: 760px) {
+  .schedule-detail-mask { align-items: end; justify-items: stretch; }
+  .schedule-detail { width: 100%; height: auto; border-radius: 14px 14px 0 0; }
+}

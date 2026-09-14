@@ -1,0 +1,56 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.healthy.appointment.mapper.PatientResourceMapper">
+    <select id="listDepartments" resultType="com.healthy.appointment.vo.PatientDepartmentVO">
+        SELECT id, name, description
+        FROM department
+        WHERE status = 1
+        ORDER BY sort_order ASC, id ASC
+    </select>
+
+    <sql id="patientDoctorColumns">
+        doc.id, doc.name, doc.gender, doc.department_id, dept.name AS department_name,
+        doc.title, doc.introduction, doc.avatar_url,
+        EXISTS(
+            SELECT 1
+            FROM doctor_schedule_slot slot
+            WHERE slot.doctor_id = doc.id
+              AND slot.schedule_date BETWEEN CURRENT_DATE AND DATE_ADD(CURRENT_DATE, INTERVAL 13 DAY)
+              AND slot.status = 'OPEN'
+              AND slot.remaining_capacity &gt; 0
+        ) AS has_available_slots
+    </sql>
+
+    <select id="listDoctors" resultType="com.healthy.appointment.vo.PatientDoctorVO">
+        SELECT <include refid="patientDoctorColumns"/>
+        FROM doctor doc
+        INNER JOIN department dept ON dept.id = doc.department_id
+        WHERE doc.status = 1 AND dept.status = 1
+        <if test="departmentId != null">AND doc.department_id = #{departmentId}</if>
+        <if test="keyword != null">
+            AND (doc.name LIKE CONCAT('%', #{keyword}, '%')
+                 OR dept.name LIKE CONCAT('%', #{keyword}, '%')
+                 OR doc.introduction LIKE CONCAT('%', #{keyword}, '%'))
+        </if>
+        ORDER BY doc.sort_order ASC, doc.id ASC
+    </select>
+
+    <select id="findDoctorById" resultType="com.healthy.appointment.vo.PatientDoctorVO">
+        SELECT <include refid="patientDoctorColumns"/>
+        FROM doctor doc
+        INNER JOIN department dept ON dept.id = doc.department_id
+        WHERE doc.id = #{id} AND doc.status = 1 AND dept.status = 1
+    </select>
+
+    <select id="listScheduleSlots" resultType="com.healthy.appointment.vo.PatientScheduleSlotVO">
+        SELECT id, schedule_date, session_type, session_name, start_time, end_time,
+               total_capacity, remaining_capacity
+        FROM doctor_schedule_slot
+        WHERE doctor_id = #{doctorId}
+          AND schedule_date BETWEEN #{startDate} AND #{endDate}
+          AND status = 'OPEN'
+        ORDER BY schedule_date ASC, start_time ASC, id ASC
+    </select>
+</mapper>

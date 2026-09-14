@@ -5,6 +5,7 @@ import { doctors } from '../api/mock'
 import { ApiError, logout as logoutRequest } from '../api/auth'
 import { departmentApi, type Department } from '../api/department'
 import { doctorApi, type Doctor } from '../api/doctor'
+import { scheduleApi, type ScheduleBatchPayload, type ScheduleSessionPayload, type ScheduleSessionType, type ScheduleSlot } from '../api/schedule'
 import { session, signOut } from '../stores/session'
 
 const router = useRouter()
@@ -25,6 +26,74 @@ const doctorModalVisible = ref(false)
 const editingDoctor = ref<Doctor | null>(null)
 const savingDoctor = ref(false)
 const doctorForm = reactive({ name: '', gender: 1, departmentId: 0, doctorCode: '', title: '', introduction: '', sortOrder: 0 })
+const scheduleSlots = ref<ScheduleSlot[]>([])
+const scheduleDoctorId = ref(0)
+const loadingSchedule = ref(false)
+const scheduleError = ref('')
+const scheduleMessage = ref('')
+const scheduleModalVisible = ref(false)
+const savingSchedule = ref(false)
+const selectedScheduleSlot = ref<ScheduleSlot | null>(null)
+const weekdayOptions = [
+  { value: 1, label: '一' }, { value: 2, label: '二' }, { value: 3, label: '三' }, { value: 4, label: '四' },
+  { value: 5, label: '五' }, { value: 6, label: '六' }, { value: 7, label: '日' }
+]
+
+function addDays(source: Date, days: number) {
+  const date = new Date(source)
+  date.setDate(date.getDate() + days)
+  return date
+}
+
+function startOfWeek(source: Date) {
+  const date = new Date(source)
+  date.setHours(0, 0, 0, 0)
+  const offset = (date.getDay() + 6) % 7
+  date.setDate(date.getDate() - offset)
+  return date
+}
+
+function formatDate(date: Date) {
+  const year = date.getFullYear()
+  const month = String(date.getMonth() + 1).padStart(2, '0')
+  const day = String(date.getDate()).padStart(2, '0')
+  return `${year}-${month}-${day}`
+}
+
+const currentMonday = startOfWeek(new Date())
+const weekStart = ref([0, 6].includes(new Date().getDay()) ? addDays(currentMonday, 7) : currentMonday)
+const weekDays = computed(() => weekdayOptions.map((weekday, index) => {
+  const date = addDays(weekStart.value, index)
+  return { ...weekday, date: formatDate(date), text: `${date.getMonth() + 1}月${date.getDate()}日` }
+}))
+const weekEnd = computed(() => addDays(weekStart.value, 6))
+const weekTitle = computed(() => `${weekStart.value.getFullYear()}年 ${weekStart.value.getMonth() + 1}月${weekStart.value.getDate()}日 — ${weekEnd.value.getMonth() + 1}月${weekEnd.value.getDate()}日`)
+const scheduleSummary = computed(() => scheduleSlots.value.reduce((summary, slot) => ({
+  total: summary.total + slot.totalCapacity,
+  booked: summary.booked + slot.bookedCapacity,
+  remaining: summary.remaining + slot.remainingCapacity
+}), { total: 0, booked: 0, remaining: 0 }))
+const scheduleRows = computed(() => managedDoctors.value
+  .filter((doctor) => !scheduleDoctorId.value || doctor.id === scheduleDoctorId.value)
+  .map((doctor) => ({ doctor, slots: scheduleSlots.value.filter((slot) => slot.doctorId === doctor.id) })))
+const scheduleForm = reactive<ScheduleBatchPayload>({
+  doctorId: 0,
+  startDate: formatDate(weekStart.value),
+  endDate: formatDate(weekEnd.value),
+  weekdays: [1, 2, 3, 4, 5],
+  sessions: []
+})
+const estimatedSessionCount = computed(() => {
+  if (!scheduleForm.startDate || !scheduleForm.endDate) return 0
+  const start = new Date(`${scheduleForm.startDate}T00:00:00`)
+  const end = new Date(`${scheduleForm.endDate}T00:00:00`)
+  let matchedDays = 0
+  for (let date = start; date <= end; date = addDays(date, 1)) {
+    const weekday = date.getDay() === 0 ? 7 : date.getDay()
+    if (scheduleForm.weekdays.includes(weekday)) matchedDays++
+  }
+  return matchedDays * scheduleForm.sessions.length
+})
 const enabledDepartments = computed(() => departments.value.filter((department) => department.status === 1))
 const menus = [
   { id: 'dashboard', label: '运营概览', icon: '◈' }, { id: 'resource', label: '医生与科室', icon: '♧' },
@@ -52,6 +121,119 @@ async function loadDoctors() {
   try { managedDoctors.value = await doctorApi.list(session.token) }
   catch (error) { doctorError.value = error instanceof ApiError ? error.message : '医生数据加载失败' }
   finally { loadingDoctors.value = false }
+}
+
+async function loadSchedule() {
+  if (!session.token) return
+  loadingSchedule.value = true
+  scheduleError.value = ''
+  try {
+    scheduleSlots.value = await scheduleApi.list(
+      session.token,
+      formatDate(weekStart.value),
+      formatDate(weekEnd.value),
+      scheduleDoctorId.value || undefined
+    )
+  } catch (error) { scheduleError.value = error instanceof ApiError ? error.message : '排班数据加载失败' }
+  finally { loadingSchedule.value = false }
+}
+
+async function prepareSchedulePage() {
+  await Promise.all([loadDepartments(), loadDoctors()])
+  if (!scheduleDoctorId.value) scheduleDoctorId.value = managedDoctors.value.find((doctor) => doctor.status === 1)?.id ?? 0
+  await loadSchedule()
+}
+
+function slotsForDay(date: string) {
+  return scheduleSlots.value.filter((slot) => slot.scheduleDate === date)
+}
+
+function slotsForDoctorDay(slots: ScheduleSlot[], date: string) {
+  return slots.filter((slot) => slot.scheduleDate === date)
+}
+
+function capacityPercent(slot: ScheduleSlot) {
+  return slot.totalCapacity ? Math.min(100, Math.round(slot.bookedCapacity / slot.totalCapacity * 100)) : 0
+}
+
+function changeWeek(offset: number) {
+  weekStart.value = addDays(weekStart.value, offset * 7)
+  void loadSchedule()
+}
+
+function newSession(sessionType: ScheduleSessionType = 'MORNING', startTime = '08:00', endTime = '12:00', capacity = 30, average = 8): ScheduleSessionPayload {
+  return { sessionType, customSessionName: '', startTime, endTime, capacity, averageConsultationMinutes: average }
+}
+
+function openBatchSchedule() {
+  scheduleForm.doctorId = scheduleDoctorId.value || managedDoctors.value.find((doctor) => doctor.status === 1)?.id || 0
+  scheduleForm.startDate = formatDate(weekStart.value)
+  scheduleForm.endDate = formatDate(weekEnd.value)
+  scheduleForm.weekdays = [1, 2, 3, 4, 5]
+  scheduleForm.sessions = [newSession(), newSession('AFTERNOON', '14:00', '17:00', 20, 9)]
+  scheduleError.value = ''
+  scheduleModalVisible.value = true
+}
+
+function addScheduleSession() {
+  scheduleForm.sessions.push(newSession('OTHER', '18:00', '20:00', 10, 10))
+}
+
+function applySessionTypeDefaults(item: ScheduleSessionPayload) {
+  if (item.sessionType === 'MORNING') { item.startTime = '08:00'; item.endTime = '12:00'; item.capacity = 30; item.averageConsultationMinutes = 8 }
+  if (item.sessionType === 'AFTERNOON') { item.startTime = '14:00'; item.endTime = '17:00'; item.capacity = 20; item.averageConsultationMinutes = 9 }
+  if (item.sessionType !== 'OTHER') item.customSessionName = ''
+}
+
+function removeScheduleSession(index: number) {
+  if (scheduleForm.sessions.length > 1) scheduleForm.sessions.splice(index, 1)
+}
+
+async function saveBatchSchedule() {
+  if (!session.token || savingSchedule.value) return
+  savingSchedule.value = true
+  scheduleError.value = ''
+  try {
+    const result = await scheduleApi.batchCreate(session.token, {
+      ...scheduleForm,
+      doctorId: Number(scheduleForm.doctorId),
+      weekdays: [...scheduleForm.weekdays],
+      sessions: scheduleForm.sessions.map((item) => ({
+        ...item,
+        customSessionName: item.sessionType === 'OTHER' ? item.customSessionName?.trim() : undefined,
+        capacity: Number(item.capacity),
+        averageConsultationMinutes: Number(item.averageConsultationMinutes)
+      }))
+    })
+    scheduleDoctorId.value = scheduleForm.doctorId
+    scheduleModalVisible.value = false
+    scheduleMessage.value = `已成功生成 ${result.createdCount} 个出诊班次`
+    await loadSchedule()
+  } catch (error) { scheduleError.value = error instanceof ApiError ? error.message : '批量排班失败' }
+  finally { savingSchedule.value = false }
+}
+
+async function toggleScheduleStatus(slot: ScheduleSlot) {
+  if (!session.token) return
+  const status = slot.status === 'OPEN' ? 'CLOSED' : 'OPEN'
+  try {
+    await scheduleApi.updateStatus(session.token, slot.id, status)
+    scheduleSlots.value = scheduleSlots.value.map((item) => item.id === slot.id ? { ...item, status } : item)
+    if (selectedScheduleSlot.value?.id === slot.id) selectedScheduleSlot.value = { ...selectedScheduleSlot.value, status }
+  } catch (error) { scheduleError.value = error instanceof ApiError ? error.message : '班次状态更新失败' }
+}
+
+async function changeScheduleCapacity(slot: ScheduleSlot) {
+  if (!session.token) return
+  const input = window.prompt(`当前已预约 ${slot.bookedCapacity} 人，请输入新的总号源：`, String(slot.totalCapacity))
+  if (input === null) return
+  const capacity = Number(input)
+  if (!Number.isInteger(capacity) || capacity < 1) { scheduleError.value = '总号源必须是大于 0 的整数'; return }
+  try {
+    await scheduleApi.updateCapacity(session.token, slot.id, capacity)
+    await loadSchedule()
+    selectedScheduleSlot.value = scheduleSlots.value.find((item) => item.id === slot.id) ?? null
+  } catch (error) { scheduleError.value = error instanceof ApiError ? error.message : '号源调整失败' }
 }
 
 function openCreateDoctor() {
@@ -140,7 +322,10 @@ function logout() {
   if (token) void logoutRequest(token).catch(() => undefined)
 }
 
-watch(active, (value) => { if (value === 'resource') { void loadDepartments(); void loadDoctors() } })
+watch(active, (value) => {
+  if (value === 'resource') { void loadDepartments(); void loadDoctors() }
+  if (value === 'schedule') void prepareSchedulePage()
+})
 watch(resourceTab, (value) => { if (value === 'doctors') void loadDoctors() })
 onMounted(() => { if (active.value === 'resource') void loadDepartments() })
 </script>
@@ -162,9 +347,100 @@ onMounted(() => { if (active.value === 'resource') void loadDepartments() })
           <div v-else class="resource-empty">还没有医生，请先创建启用的科室，再新增医生。</div>
         </template>
       </section>
+      <section v-else-if="active === 'schedule'" class="schedule-page">
+        <div class="schedule-toolbar">
+          <select v-model.number="scheduleDoctorId" class="schedule-doctor-select" @change="loadSchedule">
+            <option :value="0">全部医生</option>
+            <option v-for="doctor in managedDoctors" :key="doctor.id" :value="doctor.id">{{ doctor.name }} · {{ doctor.departmentName }}</option>
+          </select>
+          <div class="schedule-controls">
+            <button title="上一周" @click="changeWeek(-1)">‹</button>
+            <span class="week-title">{{ weekTitle }}</span>
+            <button title="下一周" @click="changeWeek(1)">›</button>
+          </div>
+          <button class="primary resource-create" :disabled="!managedDoctors.length" @click="openBatchSchedule">+ 批量排班</button>
+        </div>
+        <div class="schedule-summary">
+          <article><small>本周总号源</small><strong>{{ scheduleSummary.total }}</strong></article>
+          <article><small>已预约</small><strong>{{ scheduleSummary.booked }}</strong></article>
+          <article><small>剩余号源</small><strong>{{ scheduleSummary.remaining }}</strong></article>
+        </div>
+        <p v-if="scheduleMessage" class="schedule-message">{{ scheduleMessage }}</p>
+        <p v-if="scheduleError" class="resource-error">{{ scheduleError }}</p>
+        <div v-if="loadingSchedule" class="resource-empty">正在加载排班数据…</div>
+        <div v-else-if="scheduleDoctorId" class="schedule-week">
+          <section v-for="day in weekDays" :key="day.date" class="schedule-day" :class="{ today: day.date === formatDate(new Date()) }">
+            <div class="schedule-day-head"><b>周{{ day.label }}</b><small>{{ day.text }}</small></div>
+            <div class="schedule-day-body">
+              <article v-for="slot in slotsForDay(day.date)" :key="slot.id" class="schedule-session-card" :class="{ closed: slot.status === 'CLOSED' }">
+                <div class="session-card-head"><b>{{ slot.sessionName }}</b><span class="session-status" :class="{ closed: slot.status === 'CLOSED' }">{{ slot.status === 'OPEN' ? '开放中' : '已关闭' }}</span></div>
+                <p>{{ slot.startTime.slice(0, 5) }}–{{ slot.endTime.slice(0, 5) }} · 约 {{ slot.averageConsultationMinutes }} 分钟/人</p>
+                <p class="session-doctor">{{ slot.doctorName }} · {{ slot.departmentName }}</p>
+                <div class="capacity-bar"><i :style="{ width: `${capacityPercent(slot)}%` }"></i></div>
+                <div class="capacity-line"><span>已约 {{ slot.bookedCapacity }}/{{ slot.totalCapacity }}</span><strong>余 {{ slot.remainingCapacity }}</strong></div>
+                <div class="session-actions"><button @click="changeScheduleCapacity(slot)">调号源</button><button @click="toggleScheduleStatus(slot)">{{ slot.status === 'OPEN' ? '关闭' : '开放' }}</button></div>
+              </article>
+              <p v-if="!slotsForDay(day.date).length" class="empty-day">暂无排班</p>
+            </div>
+          </section>
+        </div>
+        <div v-else class="schedule-matrix-wrap">
+          <table class="schedule-matrix">
+            <thead><tr><th class="doctor-column">医生</th><th v-for="day in weekDays" :key="day.date"><b>周{{ day.label }}</b><small>{{ day.text }}</small></th></tr></thead>
+            <tbody>
+              <tr v-for="row in scheduleRows" :key="row.doctor.id">
+                <td class="matrix-doctor"><b>{{ row.doctor.name }}</b><small>{{ row.doctor.departmentName }} · {{ row.doctor.title || '医师' }}</small></td>
+                <td v-for="day in weekDays" :key="day.date" class="matrix-cell">
+                  <button v-for="slot in slotsForDoctorDay(row.slots, day.date)" :key="slot.id" class="matrix-slot" :class="[slot.status.toLowerCase(), slot.remainingCapacity === 0 ? 'full' : '']" @click="selectedScheduleSlot = slot">
+                    <span>{{ slot.sessionName }}</span><strong>{{ slot.status === 'CLOSED' ? '关闭' : slot.remainingCapacity === 0 ? '已满' : `余${slot.remainingCapacity}` }}</strong>
+                  </button>
+                  <span v-if="!slotsForDoctorDay(row.slots, day.date).length" class="matrix-empty">—</span>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
       <section v-else class="panel module-placeholder"><div class="module-icon">{{ menus.find((item) => item.id === active)?.icon }}</div><h2>{{ menus.find((item) => item.id === active)?.label }}</h2><p>该模块将在预约核心链路完成后接入对应的管理接口与业务规则。</p></section>
     </main>
     <div v-if="departmentModalVisible" class="modal-mask" @click.self="departmentModalVisible = false"><form class="department-modal" @submit.prevent="saveDepartment"><div class="modal-head"><div><h2>{{ editingDepartment ? '编辑科室' : '新建科室' }}</h2><p>科室名称在系统内必须唯一。</p></div><button type="button" class="modal-close" @click="departmentModalVisible = false">×</button></div><label>科室名称<input v-model.trim="departmentForm.name" maxlength="50" required placeholder="例如：心血管内科"></label><label>科室简介<textarea v-model.trim="departmentForm.description" maxlength="500" placeholder="简要介绍科室服务范围"></textarea></label><label>排序值<input v-model.number="departmentForm.sortOrder" type="number" min="0" required></label><p v-if="departmentError" class="resource-error">{{ departmentError }}</p><div class="modal-actions"><button type="button" class="modal-cancel" @click="departmentModalVisible = false">取消</button><button class="primary" :disabled="savingDepartment">{{ savingDepartment ? '保存中…' : '保存' }}</button></div></form></div>
     <div v-if="doctorModalVisible" class="modal-mask" @click.self="doctorModalVisible = false"><form class="department-modal" @submit.prevent="saveDoctor"><div class="modal-head"><div><h2>{{ editingDoctor ? '编辑医生' : '新增医生' }}</h2><p>医生工号在系统内必须唯一。</p></div><button type="button" class="modal-close" @click="doctorModalVisible = false">×</button></div><label>医生姓名<input v-model.trim="doctorForm.name" maxlength="50" required></label><label>所属科室<select v-model.number="doctorForm.departmentId" required><option :value="0" disabled>请选择科室</option><option v-for="department in enabledDepartments" :key="department.id" :value="department.id">{{ department.name }}</option></select></label><label>性别<select v-model.number="doctorForm.gender"><option :value="1">男</option><option :value="2">女</option></select></label><label>医生工号<input v-model.trim="doctorForm.doctorCode" maxlength="32" required></label><label>职称<input v-model.trim="doctorForm.title" maxlength="50"></label><label>医生简介<textarea v-model.trim="doctorForm.introduction" maxlength="5000"></textarea></label><label>排序值<input v-model.number="doctorForm.sortOrder" type="number" min="0" required></label><p v-if="doctorError" class="resource-error">{{ doctorError }}</p><div class="modal-actions"><button type="button" class="modal-cancel" @click="doctorModalVisible = false">取消</button><button class="primary" :disabled="savingDoctor">{{ savingDoctor ? '保存中…' : '保存' }}</button></div></form></div>
+    <div v-if="scheduleModalVisible" class="modal-mask" @click.self="scheduleModalVisible = false">
+      <form class="department-modal schedule-modal" @submit.prevent="saveBatchSchedule">
+        <div class="modal-head"><div><h2>批量排班</h2><p>按日期范围和星期，为医生生成上午、下午等出诊班次。</p></div><button type="button" class="modal-close" @click="scheduleModalVisible = false">×</button></div>
+        <div class="schedule-form-grid">
+          <label>出诊医生<select v-model.number="scheduleForm.doctorId" required><option :value="0" disabled>请选择医生</option><option v-for="doctor in managedDoctors.filter((item) => item.status === 1)" :key="doctor.id" :value="doctor.id">{{ doctor.name }} · {{ doctor.departmentName }}</option></select></label>
+          <span></span>
+          <label>开始日期<input v-model="scheduleForm.startDate" type="date" required></label>
+          <label>结束日期<input v-model="scheduleForm.endDate" type="date" required></label>
+        </div>
+        <label>出诊星期</label>
+        <div class="weekday-picker"><label v-for="weekday in weekdayOptions" :key="weekday.value"><input v-model="scheduleForm.weekdays" type="checkbox" :value="weekday.value"><span>周{{ weekday.label }}</span></label></div>
+        <div v-for="(item, index) in scheduleForm.sessions" :key="index" class="session-editor">
+          <div class="session-editor-head"><b>班次 {{ index + 1 }}</b><button type="button" @click="removeScheduleSession(index)">删除</button></div>
+          <div class="session-editor-fields">
+            <label>班次类型<select v-model="item.sessionType" @change="applySessionTypeDefaults(item)"><option value="MORNING">上午</option><option value="AFTERNOON">下午</option><option value="OTHER">其他</option></select></label>
+            <label v-if="item.sessionType === 'OTHER'">自定义名称<input v-model.trim="item.customSessionName" maxlength="20" required placeholder="例如：夜间门诊"></label>
+            <label>开始时间<input v-model="item.startTime" type="time" required></label>
+            <label>结束时间<input v-model="item.endTime" type="time" required></label>
+            <label>总号源<input v-model.number="item.capacity" type="number" min="1" required></label>
+            <label>分钟/人<input v-model.number="item.averageConsultationMinutes" type="number" min="1" max="60" required></label>
+          </div>
+        </div>
+        <button type="button" class="add-session" @click="addScheduleSession">+ 添加出诊班次</button>
+        <p class="schedule-preview">预计生成 {{ estimatedSessionCount }} 个班次；患者预约后将根据排队号和平均接诊时长计算预计到诊时间。</p>
+        <p v-if="scheduleError" class="resource-error">{{ scheduleError }}</p>
+        <div class="modal-actions"><button type="button" class="modal-cancel" @click="scheduleModalVisible = false">取消</button><button class="primary" :disabled="savingSchedule">{{ savingSchedule ? '生成中…' : '确认排班' }}</button></div>
+      </form>
+    </div>
+    <div v-if="selectedScheduleSlot" class="modal-mask schedule-detail-mask" @click.self="selectedScheduleSlot = null">
+      <section class="department-modal schedule-detail">
+        <div class="modal-head"><div><h2>{{ selectedScheduleSlot.sessionName }}</h2><p>{{ selectedScheduleSlot.doctorName }} · {{ selectedScheduleSlot.departmentName }}</p></div><button class="modal-close" @click="selectedScheduleSlot = null">×</button></div>
+        <div class="detail-date"><b>{{ selectedScheduleSlot.scheduleDate }}</b><span>{{ selectedScheduleSlot.startTime.slice(0, 5) }}–{{ selectedScheduleSlot.endTime.slice(0, 5) }}</span></div>
+        <div class="detail-capacity"><article><small>总号源</small><strong>{{ selectedScheduleSlot.totalCapacity }}</strong></article><article><small>已预约</small><strong>{{ selectedScheduleSlot.bookedCapacity }}</strong></article><article><small>剩余</small><strong>{{ selectedScheduleSlot.remainingCapacity }}</strong></article></div>
+        <p class="detail-note">平均每位患者约 {{ selectedScheduleSlot.averageConsultationMinutes }} 分钟，预约成功后会据此计算预计到诊时间。</p>
+        <div class="modal-actions"><button class="modal-cancel" @click="changeScheduleCapacity(selectedScheduleSlot)">调整号源</button><button class="primary" @click="toggleScheduleStatus(selectedScheduleSlot)">{{ selectedScheduleSlot.status === 'OPEN' ? '关闭班次' : '重新开放' }}</button></div>
+      </section>
+    </div>
   </div>
 </template>

@@ -1,0 +1,70 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.healthy.appointment.mapper.DoctorScheduleSlotMapper">
+    <select id="findOverlappingSlots" resultType="com.healthy.appointment.entity.DoctorScheduleSlot">
+        SELECT id, doctor_id, schedule_date, session_type, session_name, start_time, end_time,
+               average_consultation_minutes, total_capacity, remaining_capacity,
+               next_queue_number, status, version, created_at, updated_at
+        FROM doctor_schedule_slot
+        WHERE doctor_id = #{doctorId}
+          AND (
+            <foreach collection="slots" item="slot" separator=" OR ">
+                (schedule_date = #{slot.scheduleDate}
+                 AND start_time &lt; #{slot.endTime}
+                 AND end_time &gt; #{slot.startTime})
+            </foreach>
+          )
+    </select>
+
+    <insert id="batchInsert">
+        INSERT INTO doctor_schedule_slot
+            (doctor_id, schedule_date, session_type, session_name, start_time, end_time,
+             average_consultation_minutes, total_capacity, remaining_capacity,
+             next_queue_number, status, version)
+        VALUES
+        <foreach collection="slots" item="slot" separator=",">
+            (#{slot.doctorId}, #{slot.scheduleDate}, #{slot.sessionType}, #{slot.sessionName},
+             #{slot.startTime}, #{slot.endTime}, #{slot.averageConsultationMinutes},
+             #{slot.totalCapacity}, #{slot.remainingCapacity}, #{slot.nextQueueNumber},
+             #{slot.status}, #{slot.version})
+        </foreach>
+    </insert>
+
+    <select id="list" resultType="com.healthy.appointment.vo.ScheduleSlotVO">
+        SELECT slot.id, slot.doctor_id, doc.name AS doctor_name, dept.name AS department_name,
+               slot.schedule_date, slot.session_type, slot.session_name, slot.start_time, slot.end_time,
+               slot.average_consultation_minutes, slot.total_capacity,
+               slot.total_capacity - slot.remaining_capacity AS booked_capacity,
+               slot.remaining_capacity, slot.status
+        FROM doctor_schedule_slot slot
+        INNER JOIN doctor doc ON doc.id = slot.doctor_id
+        INNER JOIN department dept ON dept.id = doc.department_id
+        WHERE slot.schedule_date BETWEEN #{startDate} AND #{endDate}
+        <if test="doctorId != null">AND slot.doctor_id = #{doctorId}</if>
+        ORDER BY slot.schedule_date ASC, slot.start_time ASC, doc.sort_order ASC, doc.id ASC
+    </select>
+
+    <select id="findById" resultType="com.healthy.appointment.entity.DoctorScheduleSlot">
+        SELECT id, doctor_id, schedule_date, session_type, session_name, start_time, end_time,
+               average_consultation_minutes, total_capacity, remaining_capacity,
+               next_queue_number, status, version, created_at, updated_at
+        FROM doctor_schedule_slot
+        WHERE id = #{id}
+    </select>
+
+    <update id="updateStatus">
+        UPDATE doctor_schedule_slot
+        SET status = #{status}, version = version + 1
+        WHERE id = #{id} AND version = #{version}
+    </update>
+
+    <update id="updateCapacity">
+        UPDATE doctor_schedule_slot
+        SET remaining_capacity = #{capacity} - (total_capacity - remaining_capacity),
+            total_capacity = #{capacity},
+            version = version + 1
+        WHERE id = #{id} AND version = #{version}
+    </update>
+</mapper>
