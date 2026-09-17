@@ -20,6 +20,17 @@ async function loadAppointments() {
 }
 
 onMounted(loadAppointments)
+
+async function cancelAppointment(item: PatientAppointment) {
+  if (!session.token || item.status !== 'BOOKED' || !window.confirm('确认取消该预约吗？')) return
+  errorMessage.value = ''
+  try {
+    await appointmentApi.cancel(session.token, item.id)
+    await loadAppointments()
+  } catch (error) {
+    errorMessage.value = error instanceof ApiError ? error.message : '取消预约失败'
+  }
+}
 </script>
 
 <template>
@@ -32,7 +43,7 @@ onMounted(loadAppointments)
       <article v-for="item in items" :key="item.id" class="appointment-card">
         <div class="date-block"><b>{{ item.scheduleDate.slice(5) }}</b><small>{{ item.startTime.slice(0, 5) }}</small></div>
         <div><h3>{{ item.doctorName }} <span>{{ item.departmentName }}</span></h3><p>{{ item.appointmentNo }} · {{ item.sessionName }}</p><small>{{ item.startTime.slice(0, 5) }}–{{ item.endTime.slice(0, 5) }} · 挂号费 ¥10（模拟）</small></div>
-        <span class="status confirmed">已预约</span>
+        <div><span class="status confirmed">{{ item.status }}</span><button v-if="item.status === 'BOOKED'" class="table-action" @click="cancelAppointment(item)">取消预约</button></div>
       </article>
     </div>
     <div v-else class="department-empty">暂时没有预约记录</div>

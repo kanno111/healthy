@@ -9,6 +9,8 @@ import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PatchMapping;
+import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestAttribute;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -37,5 +39,11 @@ public class AppointmentController {
             @RequestAttribute(JwtAuthInterceptor.CURRENT_USER_ID) Long userId
     ) {
         return ApiResponse.success(appointmentService.listMyAppointments(userId));
+    }
+
+    @PatchMapping("/{id}/cancel")
+    public ApiResponse<Void> cancel(@RequestAttribute(JwtAuthInterceptor.CURRENT_USER_ID) Long userId, @PathVariable Long id) {
+        appointmentService.cancel(userId, id);
+        return ApiResponse.success();
     }
 }

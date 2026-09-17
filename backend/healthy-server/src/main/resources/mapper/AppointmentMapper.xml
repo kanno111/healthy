@@ -12,13 +12,46 @@
 
     <insert id="insert" useGeneratedKeys="true" keyProperty="appointment.id">
         INSERT INTO appointment (
-            appointment_no, patient_id, doctor_id, schedule_slot_id,
+            appointment_no, request_id, patient_id, doctor_id, schedule_slot_id,
             schedule_date, start_time, end_time, status
         ) VALUES (
-            #{appointment.appointmentNo}, #{appointment.patientId}, #{appointment.doctorId}, #{appointment.scheduleSlotId},
+            #{appointment.appointmentNo}, #{appointment.requestId}, #{appointment.patientId}, #{appointment.doctorId}, #{appointment.scheduleSlotId},
             #{appointment.scheduleDate}, #{appointment.startTime}, #{appointment.endTime}, #{appointment.status}
         )
     </insert>
+
+    <select id="findByRequestIdAndPatientId" resultType="com.healthy.appointment.vo.PatientAppointmentVO">
+        SELECT <include refid="patientAppointmentColumns"/>
+        FROM appointment
+        INNER JOIN doctor ON doctor.id = appointment.doctor_id
+        INNER JOIN department ON department.id = doctor.department_id
+        LEFT JOIN doctor_schedule_slot slot ON slot.id = appointment.schedule_slot_id
+        WHERE appointment.request_id = #{requestId}
+          AND appointment.patient_id = #{patientId}
+    </select>
+
+    <select id="findActiveByPatientIdAndScheduleSlotId" resultType="com.healthy.appointment.vo.PatientAppointmentVO">
+        SELECT <include refid="patientAppointmentColumns"/>
+        FROM appointment
+        INNER JOIN doctor ON doctor.id = appointment.doctor_id
+        INNER JOIN department ON department.id = doctor.department_id
+        LEFT JOIN doctor_schedule_slot slot ON slot.id = appointment.schedule_slot_id
+        WHERE appointment.patient_id = #{patientId}
+          AND appointment.schedule_slot_id = #{scheduleSlotId}
+          AND appointment.status = 'BOOKED'
+    </select>
+
+    <select id="findEntityByIdAndPatientId" resultType="com.healthy.appointment.entity.Appointment">
+        SELECT id, appointment_no, request_id, patient_id, doctor_id, schedule_slot_id,
+               schedule_date, start_time, end_time, status, created_at
+        FROM appointment
+        WHERE id = #{id} AND patient_id = #{patientId}
+    </select>
+
+    <update id="cancelBooked">
+        UPDATE appointment SET status = 'CANCELLED', cancelled_at = NOW()
+        WHERE id = #{id} AND patient_id = #{patientId} AND status = 'BOOKED'
+    </update>
 
     <select id="findByIdAndPatientId" resultType="com.healthy.appointment.vo.PatientAppointmentVO">
         SELECT <include refid="patientAppointmentColumns"/>

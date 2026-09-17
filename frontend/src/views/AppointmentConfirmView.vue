@@ -15,7 +15,9 @@ const slot = ref<PatientScheduleSlot | null>(null)
 const loading = ref(false)
 const submitting = ref(false)
 const errorMessage = ref('')
+const alreadyBooked = ref(false)
 const fee = 10
+const requestId = crypto.randomUUID()
 
 function formatDate(date: Date) {
   const year = date.getFullYear()
@@ -24,7 +26,7 @@ function formatDate(date: Date) {
   return `${year}-${month}-${day}`
 }
 
-const canSubmit = computed(() => doctor.value && slot.value && slot.value.remainingCapacity > 0 && !submitting.value)
+const canSubmit = computed(() => doctor.value && slot.value && slot.value.remainingCapacity > 0 && !alreadyBooked.value && !submitting.value)
 
 async function loadConfirmation() {
   if (!session.token || !Number.isInteger(doctorId) || !Number.isInteger(slotId)) {
@@ -38,12 +40,14 @@ async function loadConfirmation() {
   const endDate = new Date(startDate)
   endDate.setDate(endDate.getDate() + 13)
   try {
-    const [doctorData, slots] = await Promise.all([
+    const [doctorData, slots, appointments] = await Promise.all([
       patientResourceApi.getDoctor(session.token, doctorId),
-      patientResourceApi.listScheduleSlots(session.token, doctorId, formatDate(startDate), formatDate(endDate))
+      patientResourceApi.listScheduleSlots(session.token, doctorId, formatDate(startDate), formatDate(endDate)),
+      appointmentApi.listMine(session.token)
     ])
     doctor.value = doctorData
     slot.value = slots.find((item) => item.id === slotId) ?? null
+    alreadyBooked.value = appointments.some((item) => item.scheduleSlotId === slotId && item.status === 'BOOKED')
     if (!slot.value) errorMessage.value = '该号源已不可预约，请返回重新选择'
   } catch (error) {
     errorMessage.value = error instanceof ApiError ? error.message : '预约信息加载失败'
@@ -55,7 +59,7 @@ async function submitAppointment() {
   submitting.value = true
   errorMessage.value = ''
   try {
-    await appointmentApi.create(session.token, slot.value.id)
+    await appointmentApi.create(session.token, slot.value.id, requestId)
     await router.replace('/appointments')
   } catch (error) {
     errorMessage.value = error instanceof ApiError ? error.message : '预约创建失败，请稍后重试'
@@ -74,6 +78,7 @@ onMounted(loadConfirmation)
     <p v-if="errorMessage" class="alert">{{ errorMessage }}</p>
     <div v-if="loading" class="department-empty">正在加载预约信息…</div>
     <section v-else-if="doctor && slot" class="confirm-card">
+      <p v-if="alreadyBooked" class="alert">您已挂过该班次，请勿重复预约。</p>
       <div class="confirm-row"><span>就诊医生</span><b>{{ doctor.name }} · {{ doctor.title || '医师' }}</b></div>
       <div class="confirm-row"><span>就诊科室</span><b>{{ doctor.departmentName }}</b></div>
       <div class="confirm-row"><span>就诊日期</span><b>{{ slot.scheduleDate }}</b></div>
@@ -81,7 +86,7 @@ onMounted(loadConfirmation)
       <div class="confirm-row"><span>挂号费</span><b>¥{{ fee }}（模拟）</b></div>
       <div class="confirm-row"><span>就诊患者</span><b>{{ session.name }}（模拟患者本人）</b></div>
       <p class="confirm-tip">提交后将生成预约记录，并扣减该班次一个剩余号源。</p>
-      <div class="confirm-actions"><button class="secondary" @click="router.back()">返回修改</button><button class="primary" :disabled="!canSubmit" @click="submitAppointment">{{ submitting ? '提交中…' : '确认预约' }}</button></div>
+      <div class="confirm-actions"><button class="secondary" @click="router.back()">返回修改</button><button v-if="alreadyBooked" class="primary" @click="router.push('/appointments')">查看我的预约</button><button v-else class="primary" :disabled="!canSubmit" @click="submitAppointment">{{ submitting ? '提交中…' : '确认预约' }}</button></div>
     </section>
   </section>
 </template>

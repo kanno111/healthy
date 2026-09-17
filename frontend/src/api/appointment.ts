@@ -14,7 +14,7 @@ export type PatientAppointment = {
   sessionName: string
   startTime: string
   endTime: string
-  status: 'CONFIRMED'
+  status: 'BOOKED' | 'CANCELLED' | 'COMPLETED'
   createdAt: string
 }
 
@@ -29,10 +29,13 @@ async function request<T>(url: string, token: string, init?: RequestInit): Promi
 }
 
 export const appointmentApi = {
-  create: (token: string, scheduleSlotId: number) => request<PatientAppointment>('/api/user/appointments', token, {
+  create: (token: string, scheduleSlotId: number, requestId: string) => request<PatientAppointment>('/api/user/appointments', token, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ scheduleSlotId })
+    body: JSON.stringify({ scheduleSlotId, requestId })
   }),
-  listMine: (token: string) => request<PatientAppointment[]>('/api/user/appointments', token)
+  listMine: (token: string) => request<PatientAppointment[]>('/api/user/appointments', token),
+  cancel: (token: string, appointmentId: number) => request<null>(`/api/user/appointments/${appointmentId}/cancel`, token, {
+    method: 'PATCH'
+  })
 }

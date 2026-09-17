@@ -26,5 +26,11 @@ public final class Constant {
     public static final int MAX_PATIENT_SCHEDULE_QUERY_DAYS = 14;
 
     /** 患者已成功预约，等待到诊。 */
-    public static final String APPOINTMENT_STATUS_CONFIRMED = "CONFIRMED";
+    public static final String APPOINTMENT_STATUS_BOOKED = "BOOKED";
+
+    /** 患者已取消预约。 */
+    public static final String APPOINTMENT_STATUS_CANCELLED = "CANCELLED";
+
+    /** 患者已完成就诊。 */
+    public static final String APPOINTMENT_STATUS_COMPLETED = "COMPLETED";
 }

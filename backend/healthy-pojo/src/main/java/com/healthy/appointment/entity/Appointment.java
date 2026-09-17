@@ -10,6 +10,7 @@ import java.time.LocalTime;
 public class Appointment {
     private Long id;
     private String appointmentNo;
+    private String requestId;
     private Long patientId;
     private Long doctorId;
     private Long scheduleSlotId;

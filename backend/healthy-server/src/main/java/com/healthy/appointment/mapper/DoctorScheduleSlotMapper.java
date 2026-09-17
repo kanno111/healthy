@@ -27,6 +27,8 @@ public interface DoctorScheduleSlotMapper {
 
     int decreaseRemainingCapacity(@Param("id") Long id);
 
+    int increaseRemainingCapacity(@Param("id") Long id);
+
     int updateStatus(@Param("id") Long id, @Param("status") String status, @Param("version") Integer version);
 
     int updateCapacity(@Param("id") Long id, @Param("capacity") Integer capacity, @Param("version") Integer version);

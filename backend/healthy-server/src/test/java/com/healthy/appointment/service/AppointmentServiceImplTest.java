@@ -41,13 +41,13 @@ class AppointmentServiceImplTest {
     private AppointmentStockService appointmentStockService;
 
     @Test
-    void createDecreasesCapacityAndCreatesConfirmedAppointment() {
+    void createDecreasesCapacityAndCreatesBookedAppointment() {
         AppointmentService service = createService();
         AppointmentCreateDTO request = request(10L);
         DoctorScheduleSlot slot = availableSlot(10L, 2);
         PatientAppointmentVO expected = new PatientAppointmentVO();
         expected.setId(20L);
-        expected.setStatus("CONFIRMED");
+        expected.setStatus("BOOKED");
 
         when(patientMapper.findEnabledIdByUserId(1L)).thenReturn(5L);
         when(doctorScheduleSlotMapper.findById(10L)).thenReturn(slot);
@@ -67,7 +67,8 @@ class AppointmentServiceImplTest {
         assertThat(saved.getAppointmentNo()).hasSize(32);
         assertThat(saved.getPatientId()).isEqualTo(5L);
         assertThat(saved.getDoctorId()).isEqualTo(3L);
-        assertThat(saved.getStatus()).isEqualTo("CONFIRMED");
+        assertThat(saved.getRequestId()).isEqualTo("request-10");
+        assertThat(saved.getStatus()).isEqualTo("BOOKED");
         assertThat(result).isSameAs(expected);
     }
 
@@ -99,16 +100,49 @@ class AppointmentServiceImplTest {
     }
 
     @Test
-    void createRejectsWhenRedisStockIsInsufficientWithoutUpdatingDatabase() {
+    void createRejectsWhenRedisStockIsInsufficientWithoutChangingInventory() {
         AppointmentService service = createService();
+        when(patientMapper.findEnabledIdByUserId(1L)).thenReturn(5L);
         when(appointmentStockService.preDeduct(10L)).thenReturn(false);
 
         assertThatThrownBy(() -> service.create(1L, request(10L))).isInstanceOf(BusinessException.class);
 
-        verify(patientMapper, never()).findEnabledIdByUserId(1L);
         verify(doctorScheduleSlotMapper, never()).findById(10L);
         verify(doctorScheduleSlotMapper, never()).decreaseRemainingCapacity(10L);
         verify(appointmentMapper, never()).insert(any());
+    }
+
+    @Test
+    void createReturnsExistingAppointmentForRepeatedRequestId() {
+        AppointmentService service = createService();
+        PatientAppointmentVO expected = new PatientAppointmentVO();
+        expected.setId(20L);
+        expected.setStatus("BOOKED");
+        when(patientMapper.findEnabledIdByUserId(1L)).thenReturn(5L);
+        when(appointmentMapper.findByRequestIdAndPatientId("request-10", 5L)).thenReturn(expected);
+
+        PatientAppointmentVO result = service.create(1L, request(10L));
+
+        assertThat(result).isSameAs(expected);
+        verify(appointmentStockService, never()).preDeduct(10L);
+        verify(doctorScheduleSlotMapper, never()).decreaseRemainingCapacity(10L);
+        verify(appointmentMapper, never()).insert(any());
+    }
+
+    @Test
+    void createReturnsExistingActiveAppointmentForAnotherRepeatedSubmission() {
+        AppointmentService service = createService();
+        PatientAppointmentVO expected = new PatientAppointmentVO();
+        expected.setId(20L);
+        expected.setStatus("BOOKED");
+        when(patientMapper.findEnabledIdByUserId(1L)).thenReturn(5L);
+        when(appointmentMapper.findActiveByPatientIdAndScheduleSlotId(5L, 10L)).thenReturn(expected);
+
+        PatientAppointmentVO result = service.create(1L, request(10L));
+
+        assertThat(result).isSameAs(expected);
+        verify(appointmentStockService, never()).preDeduct(10L);
+        verify(doctorScheduleSlotMapper, never()).decreaseRemainingCapacity(10L);
     }
 
     @Test
@@ -138,6 +172,7 @@ class AppointmentServiceImplTest {
     private AppointmentCreateDTO request(Long slotId) {
         AppointmentCreateDTO request = new AppointmentCreateDTO();
         request.setScheduleSlotId(slotId);
+        request.setRequestId("request-" + slotId);
         return request;
     }
 
