@@ -23,6 +23,8 @@ public interface DoctorScheduleSlotMapper {
 
     DoctorScheduleSlot findById(@Param("id") Long id);
 
+    List<DoctorScheduleSlot> listOpenFutureSlots();
+
     int decreaseRemainingCapacity(@Param("id") Long id);
 
     int updateStatus(@Param("id") Long id, @Param("status") String status, @Param("version") Integer version);

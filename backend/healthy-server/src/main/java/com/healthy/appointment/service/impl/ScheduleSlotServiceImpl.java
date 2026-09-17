@@ -6,6 +6,7 @@ import com.healthy.appointment.enumeration.ErrorCode;
 import com.healthy.appointment.enumeration.ScheduleSessionType;
 import com.healthy.appointment.exception.BusinessException;
 import com.healthy.appointment.mapper.DoctorScheduleSlotMapper;
+import com.healthy.appointment.service.AppointmentStockService;
 import com.healthy.appointment.service.DoctorService;
 import com.healthy.appointment.service.ScheduleSlotService;
 import com.healthy.appointment.vo.DoctorVO;
@@ -14,6 +15,8 @@ import com.healthy.appointment.vo.ScheduleSlotVO;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 
 import java.time.LocalDate;
 import java.time.LocalTime;
@@ -34,6 +37,7 @@ import static com.healthy.appointment.constant.Constant.SCHEDULE_STATUS_OPEN;
 public class ScheduleSlotServiceImpl implements ScheduleSlotService {
     private final DoctorService doctorService;
     private final DoctorScheduleSlotMapper doctorScheduleSlotMapper;
+    private final AppointmentStockService appointmentStockService;
 
     /**
      * 先完整校验本次请求和既有排班，再一次性入库，避免批量请求只成功一部分。
@@ -52,6 +56,8 @@ public class ScheduleSlotServiceImpl implements ScheduleSlotService {
         }
 
         doctorScheduleSlotMapper.batchInsert(slots);
+        runAfterCommit(() -> slots.forEach(slot ->
+                appointmentStockService.initialize(slot.getId(), slot.getRemainingCapacity())));
         return new ScheduleBatchResultVO(slots.size(), slots.stream().map(this::toVO).toList());
     }
 
@@ -72,6 +78,11 @@ public class ScheduleSlotServiceImpl implements ScheduleSlotService {
         if (doctorScheduleSlotMapper.updateStatus(id, normalizedStatus, slot.getVersion()) != 1) {
             throw new BusinessException(ErrorCode.CONFLICT);
         }
+        if (SCHEDULE_STATUS_OPEN.equals(normalizedStatus)) {
+            runAfterCommit(() -> appointmentStockService.initialize(id, slot.getRemainingCapacity()));
+        } else {
+            runAfterCommit(() -> appointmentStockService.remove(id));
+        }
     }
 
     @Override
@@ -88,6 +99,8 @@ public class ScheduleSlotServiceImpl implements ScheduleSlotService {
         if (doctorScheduleSlotMapper.updateCapacity(id, capacity, slot.getVersion()) != 1) {
             throw new BusinessException(ErrorCode.CONFLICT);
         }
+        int remainingCapacity = capacity - bookedCapacity;
+        runAfterCommit(() -> appointmentStockService.initialize(id, remainingCapacity));
     }
 
     private void validateDoctor(Long doctorId) {
@@ -228,5 +241,18 @@ public class ScheduleSlotServiceImpl implements ScheduleSlotService {
             throw new BusinessException(ErrorCode.VALIDATION_ERROR);
         }
         return normalizedStatus;
+    }
+
+    private void runAfterCommit(Runnable action) {
+        if (!TransactionSynchronizationManager.isSynchronizationActive()) {
+            action.run();
+            return;
+        }
+        TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+            @Override
+            public void afterCommit() {
+                action.run();
+            }
+        });
     }
 }

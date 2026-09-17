@@ -9,10 +9,13 @@ import com.healthy.appointment.mapper.AppointmentMapper;
 import com.healthy.appointment.mapper.DoctorScheduleSlotMapper;
 import com.healthy.appointment.mapper.PatientMapper;
 import com.healthy.appointment.service.AppointmentService;
+import com.healthy.appointment.service.AppointmentStockService;
 import com.healthy.appointment.vo.PatientAppointmentVO;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
@@ -28,13 +31,23 @@ public class AppointmentServiceImpl implements AppointmentService {
     private final PatientMapper patientMapper;
     private final DoctorScheduleSlotMapper doctorScheduleSlotMapper;
     private final AppointmentMapper appointmentMapper;
+    private final AppointmentStockService appointmentStockService;
 
+
+    //TODO:限制同一患者预约同一班次
+    //TODO:挂号接口幂等
     /** 创建最小预约记录，并同步扣减对应班次的剩余号源。 */
     @Override
     @Transactional(rollbackFor = Exception.class)
     public PatientAppointmentVO create(Long userId, AppointmentCreateDTO appointmentCreateDTO) {
+        Long slotId = appointmentCreateDTO.getScheduleSlotId();
+        if (!appointmentStockService.preDeduct(slotId)) {
+            throw new BusinessException(ErrorCode.CONFLICT);
+        }
+        restoreRedisStockIfTransactionDoesNotCommit(slotId);
         Long patientId = findEnabledPatientId(userId);
-        DoctorScheduleSlot slot = getAvailableSlot(appointmentCreateDTO.getScheduleSlotId());
+        DoctorScheduleSlot slot = getAvailableSlot(slotId);
+        //校验影响行数，确保未抢到号时立刻抛出异常
         if (doctorScheduleSlotMapper.decreaseRemainingCapacity(slot.getId()) != 1) {
             throw new BusinessException(ErrorCode.CONFLICT);
         }
@@ -48,7 +61,9 @@ public class AppointmentServiceImpl implements AppointmentService {
         appointment.setStartTime(slot.getStartTime());
         appointment.setEndTime(slot.getEndTime());
         appointment.setStatus(APPOINTMENT_STATUS_CONFIRMED);
-        appointmentMapper.insert(appointment);
+        if (appointmentMapper.insert(appointment) != 1) {
+            throw new BusinessException(ErrorCode.INTERNAL_ERROR);
+        }
 
         return appointmentMapper.findByIdAndPatientId(appointment.getId(), patientId);
     }
@@ -81,5 +96,19 @@ public class AppointmentServiceImpl implements AppointmentService {
             throw new BusinessException(ErrorCode.CONFLICT);
         }
         return slot;
+    }
+
+    private void restoreRedisStockIfTransactionDoesNotCommit(Long slotId) {
+        if (!TransactionSynchronizationManager.isSynchronizationActive()) {
+            return;
+        }
+        TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+            @Override
+            public void afterCompletion(int status) {
+                if (status != TransactionSynchronization.STATUS_COMMITTED) {
+                    appointmentStockService.restore(slotId);
+                }
+            }
+        });
     }
 }

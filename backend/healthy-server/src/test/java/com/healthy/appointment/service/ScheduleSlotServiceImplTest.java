@@ -33,9 +33,12 @@ class ScheduleSlotServiceImplTest {
     @Mock
     private DoctorScheduleSlotMapper doctorScheduleSlotMapper;
 
+    @Mock
+    private AppointmentStockService appointmentStockService;
+
     @Test
     void batchCreateCreatesOneSlotForEachSession() {
-        ScheduleSlotService service = new ScheduleSlotServiceImpl(doctorService, doctorScheduleSlotMapper);
+        ScheduleSlotService service = new ScheduleSlotServiceImpl(doctorService, doctorScheduleSlotMapper, appointmentStockService);
         LocalDate date = LocalDate.now().plusDays(1);
         when(doctorService.getById(1L)).thenReturn(enabledDoctor());
         when(doctorScheduleSlotMapper.findOverlappingSlots(eq(1L), any())).thenReturn(List.of());
@@ -62,7 +65,7 @@ class ScheduleSlotServiceImplTest {
 
     @Test
     void batchCreateRejectsExistingOverlapWithoutWritingAnything() {
-        ScheduleSlotService service = new ScheduleSlotServiceImpl(doctorService, doctorScheduleSlotMapper);
+        ScheduleSlotService service = new ScheduleSlotServiceImpl(doctorService, doctorScheduleSlotMapper, appointmentStockService);
         LocalDate date = LocalDate.now().plusDays(1);
         when(doctorService.getById(1L)).thenReturn(enabledDoctor());
         when(doctorScheduleSlotMapper.findOverlappingSlots(eq(1L), any())).thenReturn(List.of(new DoctorScheduleSlot()));
@@ -75,7 +78,7 @@ class ScheduleSlotServiceImplTest {
 
     @Test
     void batchCreateRejectsOverlappingSessionsInSameRequest() {
-        ScheduleSlotService service = new ScheduleSlotServiceImpl(doctorService, doctorScheduleSlotMapper);
+        ScheduleSlotService service = new ScheduleSlotServiceImpl(doctorService, doctorScheduleSlotMapper, appointmentStockService);
         LocalDate date = LocalDate.now().plusDays(1);
         ScheduleBatchDTO request = request(date, LocalTime.of(9, 0), LocalTime.of(12, 0));
         request.setSessions(List.of(session(LocalTime.of(9, 0), LocalTime.of(12, 0)),

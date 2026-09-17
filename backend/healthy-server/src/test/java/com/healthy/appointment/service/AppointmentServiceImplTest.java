@@ -11,6 +11,8 @@ import com.healthy.appointment.service.impl.AppointmentServiceImpl;
 import com.healthy.appointment.vo.PatientAppointmentVO;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
@@ -35,6 +37,9 @@ class AppointmentServiceImplTest {
     @Mock
     private AppointmentMapper appointmentMapper;
 
+    @Mock
+    private AppointmentStockService appointmentStockService;
+
     @Test
     void createDecreasesCapacityAndCreatesConfirmedAppointment() {
         AppointmentService service = createService();
@@ -46,6 +51,7 @@ class AppointmentServiceImplTest {
 
         when(patientMapper.findEnabledIdByUserId(1L)).thenReturn(5L);
         when(doctorScheduleSlotMapper.findById(10L)).thenReturn(slot);
+        when(appointmentStockService.preDeduct(10L)).thenReturn(true);
         when(doctorScheduleSlotMapper.decreaseRemainingCapacity(10L)).thenReturn(1);
         doAnswer(invocation -> {
             invocation.getArgument(0, Appointment.class).setId(20L);
@@ -69,6 +75,7 @@ class AppointmentServiceImplTest {
     void createRejectsFullSlotBeforeDecreasingCapacity() {
         AppointmentService service = createService();
         DoctorScheduleSlot slot = availableSlot(10L, 0);
+        when(appointmentStockService.preDeduct(10L)).thenReturn(true);
         when(patientMapper.findEnabledIdByUserId(1L)).thenReturn(5L);
         when(doctorScheduleSlotMapper.findById(10L)).thenReturn(slot);
 
@@ -83,6 +90,7 @@ class AppointmentServiceImplTest {
         AppointmentService service = createService();
         when(patientMapper.findEnabledIdByUserId(1L)).thenReturn(5L);
         when(doctorScheduleSlotMapper.findById(10L)).thenReturn(availableSlot(10L, 1));
+        when(appointmentStockService.preDeduct(10L)).thenReturn(true);
         when(doctorScheduleSlotMapper.decreaseRemainingCapacity(10L)).thenReturn(0);
 
         assertThatThrownBy(() -> service.create(1L, request(10L))).isInstanceOf(BusinessException.class);
@@ -90,8 +98,41 @@ class AppointmentServiceImplTest {
         verify(appointmentMapper, never()).insert(any());
     }
 
+    @Test
+    void createRejectsWhenRedisStockIsInsufficientWithoutUpdatingDatabase() {
+        AppointmentService service = createService();
+        when(appointmentStockService.preDeduct(10L)).thenReturn(false);
+
+        assertThatThrownBy(() -> service.create(1L, request(10L))).isInstanceOf(BusinessException.class);
+
+        verify(patientMapper, never()).findEnabledIdByUserId(1L);
+        verify(doctorScheduleSlotMapper, never()).findById(10L);
+        verify(doctorScheduleSlotMapper, never()).decreaseRemainingCapacity(10L);
+        verify(appointmentMapper, never()).insert(any());
+    }
+
+    @Test
+    void createRestoresRedisStockWhenDatabaseTransactionRollsBack() {
+        AppointmentService service = createService();
+        when(patientMapper.findEnabledIdByUserId(1L)).thenReturn(5L);
+        when(doctorScheduleSlotMapper.findById(10L)).thenReturn(availableSlot(10L, 1));
+        when(appointmentStockService.preDeduct(10L)).thenReturn(true);
+        when(doctorScheduleSlotMapper.decreaseRemainingCapacity(10L)).thenReturn(0);
+
+        TransactionSynchronizationManager.initSynchronization();
+        try {
+            assertThatThrownBy(() -> service.create(1L, request(10L))).isInstanceOf(BusinessException.class);
+            TransactionSynchronizationManager.getSynchronizations().forEach(synchronization ->
+                    synchronization.afterCompletion(TransactionSynchronization.STATUS_ROLLED_BACK));
+        } finally {
+            TransactionSynchronizationManager.clearSynchronization();
+        }
+
+        verify(appointmentStockService).restore(10L);
+    }
+
     private AppointmentService createService() {
-        return new AppointmentServiceImpl(patientMapper, doctorScheduleSlotMapper, appointmentMapper);
+        return new AppointmentServiceImpl(patientMapper, doctorScheduleSlotMapper, appointmentMapper, appointmentStockService);
     }
 
     private AppointmentCreateDTO request(Long slotId) {

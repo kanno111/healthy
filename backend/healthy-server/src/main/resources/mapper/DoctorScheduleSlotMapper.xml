@@ -18,7 +18,7 @@
           )
     </select>
 
-    <insert id="batchInsert">
+    <insert id="batchInsert" useGeneratedKeys="true" keyProperty="slots.id" keyColumn="id">
         INSERT INTO doctor_schedule_slot
             (doctor_id, schedule_date, session_type, session_name, start_time, end_time,
              average_consultation_minutes, total_capacity, remaining_capacity,
@@ -52,6 +52,15 @@
                next_queue_number, status, version, created_at, updated_at
         FROM doctor_schedule_slot
         WHERE id = #{id}
+    </select>
+
+    <select id="listOpenFutureSlots" resultType="com.healthy.appointment.entity.DoctorScheduleSlot">
+        SELECT id, doctor_id, schedule_date, session_type, session_name, start_time, end_time,
+               average_consultation_minutes, total_capacity, remaining_capacity,
+               next_queue_number, status, version, created_at, updated_at
+        FROM doctor_schedule_slot
+        WHERE status = 'OPEN'
+          AND schedule_date &gt;= CURRENT_DATE
     </select>
 
     <update id="decreaseRemainingCapacity">

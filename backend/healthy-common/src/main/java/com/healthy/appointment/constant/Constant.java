@@ -10,6 +10,9 @@ public final class Constant {
     /** 当前有效登录 Token 的 Redis 键前缀。 */
     public static final String AUTH_TOKEN_PREFIX = "auth:token:";
 
+    /** Redis 中班次剩余号源的键前缀。 */
+    public static final String APPOINTMENT_STOCK_PREFIX = "appointment:stock:";
+
     /** 排班处于开放预约状态。 */
     public static final String SCHEDULE_STATUS_OPEN = "OPEN";
 
