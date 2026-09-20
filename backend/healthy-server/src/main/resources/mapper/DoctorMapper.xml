@@ -40,20 +40,12 @@
         ORDER BY doc.sort_order ASC, doc.id ASC
     </select>
 
-    <select id="count" resultType="long">
-        SELECT COUNT(*)
-        FROM doctor doc
-        INNER JOIN department dept ON dept.id = doc.department_id
-        <include refid="doctorPageConditions"/>
-    </select>
-
     <select id="page" resultType="com.healthy.appointment.vo.DoctorVO">
         SELECT <include refid="doctorColumns"/>
         FROM doctor doc
         INNER JOIN department dept ON dept.id = doc.department_id
         <include refid="doctorPageConditions"/>
         ORDER BY doc.sort_order ASC, doc.id ASC
-        LIMIT #{offset}, #{pageSize}
     </select>
 
     <select id="findById" resultType="com.healthy.appointment.vo.DoctorVO">
@@ -63,29 +55,4 @@
         WHERE doc.id = #{id}
     </select>
 
-    <select id="existsByDoctorCode" resultType="boolean">
-        SELECT EXISTS(
-            SELECT 1 FROM doctor
-            WHERE doctor_code = #{doctorCode}
-            <if test="excludeId != null">AND id != #{excludeId}</if>
-        )
-    </select>
-
-    <insert id="insert" useGeneratedKeys="true" keyProperty="doctor.id">
-        INSERT INTO doctor (name, gender, department_id, doctor_code, title, introduction, avatar_url, sort_order, status)
-        VALUES (#{doctor.name}, #{doctor.gender}, #{doctor.departmentId}, #{doctor.doctorCode}, #{doctor.title},
-                #{doctor.introduction}, #{doctor.avatarUrl}, #{doctor.sortOrder}, 1)
-    </insert>
-
-    <update id="update">
-        UPDATE doctor
-        SET name = #{doctor.name}, gender = #{doctor.gender}, department_id = #{doctor.departmentId},
-            doctor_code = #{doctor.doctorCode}, title = #{doctor.title}, introduction = #{doctor.introduction},
-            avatar_url = #{doctor.avatarUrl}, sort_order = #{doctor.sortOrder}
-        WHERE id = #{doctor.id}
-    </update>
-
-    <update id="updateStatus">
-        UPDATE doctor SET status = #{status} WHERE id = #{id}
-    </update>
 </mapper>

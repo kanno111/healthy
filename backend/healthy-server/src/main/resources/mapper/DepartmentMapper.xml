@@ -34,26 +34,4 @@
         GROUP BY d.id, d.name, d.description, d.sort_order, d.status, d.created_at, d.updated_at
     </select>
 
-    <select id="existsByName" resultType="boolean">
-        SELECT EXISTS(
-            SELECT 1 FROM department
-            WHERE name = #{name}
-            <if test="excludeId != null">AND id != #{excludeId}</if>
-        )
-    </select>
-
-    <insert id="insert" useGeneratedKeys="true" keyProperty="department.id">
-        INSERT INTO department (name, description, sort_order, status)
-        VALUES (#{department.name}, #{department.description}, #{department.sortOrder}, 1)
-    </insert>
-
-    <update id="update">
-        UPDATE department
-        SET name = #{department.name}, description = #{department.description}, sort_order = #{department.sortOrder}
-        WHERE id = #{department.id}
-    </update>
-
-    <update id="updateStatus">
-        UPDATE department SET status = #{status} WHERE id = #{id}
-    </update>
 </mapper>

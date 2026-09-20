@@ -1,5 +1,7 @@
 package com.healthy.appointment.service;
 
+import com.baomidou.mybatisplus.core.metadata.IPage;
+import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.healthy.appointment.dto.DoctorSaveDTO;
 import com.healthy.appointment.entity.Doctor;
 import com.healthy.appointment.exception.BusinessException;
@@ -18,6 +20,8 @@ import java.util.List;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.ArgumentMatchers.isNull;
 import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -26,7 +30,6 @@ import static org.mockito.Mockito.when;
 class DoctorServiceImplTest {
     @Mock
     private DoctorMapper doctorMapper;
-
     @Mock
     private DepartmentService departmentService;
 
@@ -34,7 +37,6 @@ class DoctorServiceImplTest {
     void createSavesDoctorForEnabledDepartment() {
         DoctorService service = new DoctorServiceImpl(doctorMapper, departmentService);
         when(departmentService.getById(1L)).thenReturn(department(1));
-        when(doctorMapper.existsByDoctorCode("D1001", null)).thenReturn(false);
         doAnswer(invocation -> {
             invocation.getArgument(0, Doctor.class).setId(10L);
             return 1;
@@ -47,6 +49,7 @@ class DoctorServiceImplTest {
         assertThat(id).isEqualTo(10L);
         assertThat(captor.getValue().getName()).isEqualTo("doctor zhang");
         assertThat(captor.getValue().getSortOrder()).isZero();
+        assertThat(captor.getValue().getStatus()).isEqualTo(1);
     }
 
     @Test
@@ -54,37 +57,37 @@ class DoctorServiceImplTest {
         DoctorService service = new DoctorServiceImpl(doctorMapper, departmentService);
         when(departmentService.getById(1L)).thenReturn(department(0));
 
-        assertThatThrownBy(() -> service.create(request()))
-                .isInstanceOf(BusinessException.class);
+        assertThatThrownBy(() -> service.create(request())).isInstanceOf(BusinessException.class);
     }
 
     @Test
     void createRejectsDuplicateDoctorCode() {
         DoctorService service = new DoctorServiceImpl(doctorMapper, departmentService);
         when(departmentService.getById(1L)).thenReturn(department(1));
-        when(doctorMapper.existsByDoctorCode("D1001", null)).thenReturn(true);
+        when(doctorMapper.exists(any())).thenReturn(true);
 
-        assertThatThrownBy(() -> service.create(request()))
-                .isInstanceOf(BusinessException.class);
+        assertThatThrownBy(() -> service.create(request())).isInstanceOf(BusinessException.class);
     }
 
     @Test
     void updateStatusRejectsInvalidValue() {
         DoctorService service = new DoctorServiceImpl(doctorMapper, departmentService);
 
-        assertThatThrownBy(() -> service.updateStatus(1L, 2))
-                .isInstanceOf(BusinessException.class);
+        assertThatThrownBy(() -> service.updateStatus(1L, 2)).isInstanceOf(BusinessException.class);
     }
 
     @Test
-    void pageCalculatesOffsetAndTotalPages() {
+    void pageUsesMybatisPlusPagination() {
         DoctorService service = new DoctorServiceImpl(doctorMapper, departmentService);
         DoctorVO doctor = new DoctorVO();
         doctor.setId(11L);
-        when(doctorMapper.count("张", null, 1L, 1, null)).thenReturn(21L);
-        when(doctorMapper.page("张", null, 1L, 1, null, 10L, 10)).thenReturn(List.of(doctor));
+        Page<DoctorVO> resultPage = new Page<>(2, 10);
+        resultPage.setTotal(21L);
+        resultPage.setRecords(List.of(doctor));
+        when(doctorMapper.page(any(IPage.class), eq("Zhang"), isNull(), eq(1L), eq(1), isNull()))
+                .thenReturn(resultPage);
 
-        var result = service.page(" 张 ", 1L, 1, 2, 10);
+        var result = service.page(" Zhang ", 1L, 1, 2, 10);
 
         assertThat(result.records()).containsExactly(doctor);
         assertThat(result.total()).isEqualTo(21L);
@@ -95,11 +98,12 @@ class DoctorServiceImplTest {
     @Test
     void pageVisibleRestrictsDoctorAndDepartmentStatus() {
         DoctorService service = new DoctorServiceImpl(doctorMapper, departmentService);
-        when(doctorMapper.count(null, "心血管", 1L, 1, 1)).thenReturn(0L);
+        when(doctorMapper.page(any(IPage.class), isNull(), eq("cardiology"), eq(1L), eq(1), eq(1)))
+                .thenReturn(new Page<>(1, 10));
 
-        service.pageVisible(1L, " 心血管 ", 1, 10);
+        service.pageVisible(1L, " cardiology ", 1, 10);
 
-        verify(doctorMapper).count(null, "心血管", 1L, 1, 1);
+        verify(doctorMapper).page(any(IPage.class), isNull(), eq("cardiology"), eq(1L), eq(1), eq(1));
     }
 
     private DoctorSaveDTO request() {

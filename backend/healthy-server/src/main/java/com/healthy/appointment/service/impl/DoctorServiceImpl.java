@@ -1,5 +1,10 @@
 package com.healthy.appointment.service.impl;
 
+import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
+import com.baomidou.mybatisplus.core.metadata.IPage;
+import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
+import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.healthy.appointment.dto.DoctorSaveDTO;
 import com.healthy.appointment.entity.Doctor;
 import com.healthy.appointment.enumeration.ErrorCode;
@@ -10,16 +15,20 @@ import com.healthy.appointment.service.DepartmentService;
 import com.healthy.appointment.service.DoctorService;
 import com.healthy.appointment.vo.DepartmentVO;
 import com.healthy.appointment.vo.DoctorVO;
-import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
 
 @Service
-@RequiredArgsConstructor
-public class DoctorServiceImpl implements DoctorService {
+public class DoctorServiceImpl extends ServiceImpl<DoctorMapper, Doctor> implements DoctorService {
     private final DoctorMapper doctorMapper;
     private final DepartmentService departmentService;
+
+    public DoctorServiceImpl(DoctorMapper doctorMapper, DepartmentService departmentService) {
+        this.doctorMapper = doctorMapper;
+        this.departmentService = departmentService;
+        this.baseMapper = doctorMapper;
+    }
 
     @Override
     public List<DoctorVO> list(String name, Long departmentId, Integer status) {
@@ -48,12 +57,9 @@ public class DoctorServiceImpl implements DoctorService {
             int pageSize
     ) {
         validatePage(page, pageSize);
-        long total = doctorMapper.count(name, keyword, departmentId, status, departmentStatus);
-        long offset = (long) (page - 1) * pageSize;
-        List<DoctorVO> records = total == 0
-                ? List.of()
-                : doctorMapper.page(name, keyword, departmentId, status, departmentStatus, offset, pageSize);
-        return PageResult.of(records, total, page, pageSize);
+        IPage<DoctorVO> result = doctorMapper.page(
+                new Page<>(page, pageSize), name, keyword, departmentId, status, departmentStatus);
+        return PageResult.of(result.getRecords(), result.getTotal(), page, pageSize);
     }
 
     @Override
@@ -69,10 +75,11 @@ public class DoctorServiceImpl implements DoctorService {
     public Long create(DoctorSaveDTO doctorSaveDTO) {
         Doctor doctor = toDoctor(doctorSaveDTO);
         validateEnabledDepartment(doctor.getDepartmentId());
-        if (doctorMapper.existsByDoctorCode(doctor.getDoctorCode(), null)) {
+        if (doctorMapper.exists(new LambdaQueryWrapper<Doctor>().eq(Doctor::getDoctorCode, doctor.getDoctorCode()))) {
             throw new BusinessException(ErrorCode.CONFLICT);
         }
-        doctorMapper.insert(doctor);
+        doctor.setStatus(1);
+        save(doctor);
         return doctor.getId();
     }
 
@@ -82,17 +89,19 @@ public class DoctorServiceImpl implements DoctorService {
         Doctor doctor = toDoctor(doctorSaveDTO);
         doctor.setId(id);
         validateEnabledDepartment(doctor.getDepartmentId());
-        if (doctorMapper.existsByDoctorCode(doctor.getDoctorCode(), id)) {
+        if (doctorMapper.exists(new LambdaQueryWrapper<Doctor>()
+                .eq(Doctor::getDoctorCode, doctor.getDoctorCode()).ne(Doctor::getId, id))) {
             throw new BusinessException(ErrorCode.CONFLICT);
         }
-        doctorMapper.update(doctor);
+        updateById(doctor);
     }
 
     @Override
     public void updateStatus(Long id, Integer status) {
         validateStatus(status);
         getById(id);
-        doctorMapper.updateStatus(id, status);
+        doctorMapper.update(null, new LambdaUpdateWrapper<Doctor>()
+                .eq(Doctor::getId, id).set(Doctor::getStatus, status));
     }
 
     private void validateEnabledDepartment(Long departmentId) {

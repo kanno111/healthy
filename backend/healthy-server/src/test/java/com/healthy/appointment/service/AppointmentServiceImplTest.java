@@ -3,6 +3,7 @@ package com.healthy.appointment.service;
 import com.healthy.appointment.dto.AppointmentCreateDTO;
 import com.healthy.appointment.entity.Appointment;
 import com.healthy.appointment.entity.DoctorScheduleSlot;
+import com.healthy.appointment.entity.Patient;
 import com.healthy.appointment.exception.BusinessException;
 import com.healthy.appointment.mapper.AppointmentMapper;
 import com.healthy.appointment.mapper.DoctorScheduleSlotMapper;
@@ -49,7 +50,7 @@ class AppointmentServiceImplTest {
         expected.setId(20L);
         expected.setStatus("BOOKED");
 
-        when(patientMapper.findEnabledIdByUserId(1L)).thenReturn(5L);
+        when(patientMapper.selectOne(any())).thenReturn(enabledPatient(5L));
         when(doctorScheduleSlotMapper.findById(10L)).thenReturn(slot);
         when(appointmentStockService.preDeduct(10L)).thenReturn(true);
         when(doctorScheduleSlotMapper.decreaseRemainingCapacity(10L)).thenReturn(1);
@@ -77,7 +78,7 @@ class AppointmentServiceImplTest {
         AppointmentService service = createService();
         DoctorScheduleSlot slot = availableSlot(10L, 0);
         when(appointmentStockService.preDeduct(10L)).thenReturn(true);
-        when(patientMapper.findEnabledIdByUserId(1L)).thenReturn(5L);
+        when(patientMapper.selectOne(any())).thenReturn(enabledPatient(5L));
         when(doctorScheduleSlotMapper.findById(10L)).thenReturn(slot);
 
         assertThatThrownBy(() -> service.create(1L, request(10L))).isInstanceOf(BusinessException.class);
@@ -89,7 +90,7 @@ class AppointmentServiceImplTest {
     @Test
     void createRejectsWhenCapacityChangesBeforeUpdate() {
         AppointmentService service = createService();
-        when(patientMapper.findEnabledIdByUserId(1L)).thenReturn(5L);
+        when(patientMapper.selectOne(any())).thenReturn(enabledPatient(5L));
         when(doctorScheduleSlotMapper.findById(10L)).thenReturn(availableSlot(10L, 1));
         when(appointmentStockService.preDeduct(10L)).thenReturn(true);
         when(doctorScheduleSlotMapper.decreaseRemainingCapacity(10L)).thenReturn(0);
@@ -102,7 +103,7 @@ class AppointmentServiceImplTest {
     @Test
     void createRejectsWhenRedisStockIsInsufficientWithoutChangingInventory() {
         AppointmentService service = createService();
-        when(patientMapper.findEnabledIdByUserId(1L)).thenReturn(5L);
+        when(patientMapper.selectOne(any())).thenReturn(enabledPatient(5L));
         when(appointmentStockService.preDeduct(10L)).thenReturn(false);
 
         assertThatThrownBy(() -> service.create(1L, request(10L))).isInstanceOf(BusinessException.class);
@@ -118,7 +119,7 @@ class AppointmentServiceImplTest {
         PatientAppointmentVO expected = new PatientAppointmentVO();
         expected.setId(20L);
         expected.setStatus("BOOKED");
-        when(patientMapper.findEnabledIdByUserId(1L)).thenReturn(5L);
+        when(patientMapper.selectOne(any())).thenReturn(enabledPatient(5L));
         when(appointmentMapper.findByRequestIdAndPatientId("request-10", 5L)).thenReturn(expected);
 
         PatientAppointmentVO result = service.create(1L, request(10L));
@@ -135,7 +136,7 @@ class AppointmentServiceImplTest {
         PatientAppointmentVO expected = new PatientAppointmentVO();
         expected.setId(20L);
         expected.setStatus("BOOKED");
-        when(patientMapper.findEnabledIdByUserId(1L)).thenReturn(5L);
+        when(patientMapper.selectOne(any())).thenReturn(enabledPatient(5L));
         when(appointmentMapper.findActiveByPatientIdAndScheduleSlotId(5L, 10L)).thenReturn(expected);
 
         PatientAppointmentVO result = service.create(1L, request(10L));
@@ -148,7 +149,7 @@ class AppointmentServiceImplTest {
     @Test
     void createRestoresRedisStockWhenDatabaseTransactionRollsBack() {
         AppointmentService service = createService();
-        when(patientMapper.findEnabledIdByUserId(1L)).thenReturn(5L);
+        when(patientMapper.selectOne(any())).thenReturn(enabledPatient(5L));
         when(doctorScheduleSlotMapper.findById(10L)).thenReturn(availableSlot(10L, 1));
         when(appointmentStockService.preDeduct(10L)).thenReturn(true);
         when(doctorScheduleSlotMapper.decreaseRemainingCapacity(10L)).thenReturn(0);
@@ -186,5 +187,12 @@ class AppointmentServiceImplTest {
         slot.setStatus("OPEN");
         slot.setRemainingCapacity(remainingCapacity);
         return slot;
+    }
+
+    private Patient enabledPatient(Long id) {
+        Patient patient = new Patient();
+        patient.setId(id);
+        patient.setStatus(1);
+        return patient;
     }
 }

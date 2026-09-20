@@ -6,6 +6,7 @@ import { ApiError, logout as logoutRequest } from '../api/auth'
 import { departmentApi, type Department } from '../api/department'
 import { doctorApi, type Doctor } from '../api/doctor'
 import { scheduleApi, type ScheduleBatchPayload, type ScheduleSessionPayload, type ScheduleSessionType, type ScheduleSlot } from '../api/schedule'
+import { adminAppointmentApi, type AdminAppointment } from '../api/admin-appointment'
 import { session, signOut } from '../stores/session'
 
 const router = useRouter()
@@ -43,6 +44,10 @@ const scheduleMessage = ref('')
 const scheduleModalVisible = ref(false)
 const savingSchedule = ref(false)
 const selectedScheduleSlot = ref<ScheduleSlot | null>(null)
+const adminAppointments = ref<AdminAppointment[]>([])
+const loadingAppointments = ref(false)
+const appointmentError = ref('')
+const completingAppointmentId = ref<number | null>(null)
 const weekdayOptions = [
   { value: 1, label: '一' }, { value: 2, label: '二' }, { value: 3, label: '三' }, { value: 4, label: '四' },
   { value: 5, label: '五' }, { value: 6, label: '六' }, { value: 7, label: '日' }
@@ -409,6 +414,44 @@ async function toggleDepartmentStatus(department: Department) {
   } catch (error) { departmentError.value = error instanceof ApiError ? error.message : '状态更新失败' }
 }
 
+async function loadAdminAppointments() {
+  if (!session.token) return
+  loadingAppointments.value = true
+  appointmentError.value = ''
+  try {
+    adminAppointments.value = await adminAppointmentApi.list(session.token)
+  } catch (error) {
+    appointmentError.value = error instanceof ApiError ? error.message : '预约订单加载失败'
+  } finally {
+    loadingAppointments.value = false
+  }
+}
+
+function canCompleteAppointment(item: AdminAppointment) {
+  return item.status === 'BOOKED' && new Date(`${item.scheduleDate}T${item.startTime}`).getTime() <= Date.now()
+}
+
+function appointmentStatusText(status: AdminAppointment['status']) {
+  return { BOOKED: '待就诊', CANCELLED: '已取消', COMPLETED: '已完成' }[status]
+}
+
+async function completeAppointment(item: AdminAppointment) {
+  if (!session.token || completingAppointmentId.value !== null || !canCompleteAppointment(item)) return
+  if (!window.confirm(`确认将预约单 ${item.appointmentNo} 标记为已完成？`)) return
+  completingAppointmentId.value = item.id
+  appointmentError.value = ''
+  try {
+    await adminAppointmentApi.complete(session.token, item.id)
+    adminAppointments.value = adminAppointments.value.map((record) =>
+      record.id === item.id ? { ...record, status: 'COMPLETED' } : record)
+  } catch (error) {
+    appointmentError.value = error instanceof ApiError ? error.message : '确认就诊失败'
+    await loadAdminAppointments()
+  } finally {
+    completingAppointmentId.value = null
+  }
+}
+
 function logout() {
   const token = session.token
   signOut(); router.replace('/login')
@@ -418,6 +461,7 @@ function logout() {
 watch(active, (value) => {
   if (value === 'resource') { void loadDepartments(); if (resourceTab.value === 'doctors') void loadDoctorPage() }
   if (value === 'schedule') void prepareSchedulePage()
+  if (value === 'appointments') void loadAdminAppointments()
 })
 watch(resourceTab, (value) => { if (value === 'doctors') void loadDoctorPage() })
 onMounted(() => { if (active.value === 'resource') void loadDepartments() })
@@ -440,6 +484,13 @@ onMounted(() => { if (active.value === 'resource') void loadDepartments() })
           <div v-if="doctorTotal > 0" class="doctor-pagination"><label>每页<select v-model.number="doctorPageSize" @change="changeDoctorPageSize"><option :value="10">10 条</option><option :value="20">20 条</option><option :value="50">50 条</option></select></label><span>共 {{ doctorTotal }} 位医生</span><div><button :disabled="doctorPage === 1" @click="changeDoctorPage(doctorPage - 1)">上一页</button><b>第 {{ doctorPage }} / {{ doctorTotalPages }} 页</b><button :disabled="doctorPage === doctorTotalPages" @click="changeDoctorPage(doctorPage + 1)">下一页</button></div></div>
           <div v-if="!loadingDoctorPage && !doctorPageRecords.length" class="resource-empty">没有找到符合条件的医生。</div>
         </template>
+      </section>
+      <section v-else-if="active === 'appointments'" class="resource-page">
+        <div class="resource-intro"><div><h2>预约订单</h2><p>查看患者预约记录；仅已到就诊开始时间且仍待就诊的订单可标记为完成。</p></div><button class="table-action" :disabled="loadingAppointments" @click="loadAdminAppointments">刷新</button></div>
+        <p v-if="appointmentError" class="resource-error">{{ appointmentError }}</p>
+        <div v-if="loadingAppointments" class="resource-empty">正在加载预约订单…</div>
+        <section v-else-if="adminAppointments.length" class="doctor-admin-table"><table><thead><tr><th>预约单号</th><th>患者</th><th>医生 / 科室</th><th>就诊时段</th><th>状态</th><th>操作</th></tr></thead><tbody><tr v-for="item in adminAppointments" :key="item.id"><td>{{ item.appointmentNo }}</td><td><b>{{ item.patientName }}</b></td><td>{{ item.doctorName }}<small class="appointment-department">{{ item.departmentName }}</small></td><td>{{ item.scheduleDate }} {{ item.startTime.slice(0, 5) }}-{{ item.endTime.slice(0, 5) }}<small class="appointment-department">{{ item.sessionName }}</small></td><td><span class="status" :class="item.status.toLowerCase()">{{ appointmentStatusText(item.status) }}</span></td><td><button v-if="canCompleteAppointment(item)" class="table-action" :disabled="completingAppointmentId !== null" @click="completeAppointment(item)">{{ completingAppointmentId === item.id ? '处理中…' : '确认完成' }}</button><span v-else class="appointment-action-hint">{{ item.status === 'BOOKED' ? '未到就诊时间' : '-' }}</span></td></tr></tbody></table></section>
+        <div v-else class="resource-empty">暂无预约订单。</div>
       </section>
       <section v-else-if="active === 'schedule'" class="schedule-page">
         <div class="schedule-toolbar">

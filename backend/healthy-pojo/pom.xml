@@ -4,6 +4,11 @@
     <parent><groupId>com.healthy</groupId><artifactId>healthy-backend</artifactId><version>0.0.1-SNAPSHOT</version></parent>
     <artifactId>healthy-pojo</artifactId>
     <dependencies>
+        <dependency>
+            <groupId>com.baomidou</groupId>
+            <artifactId>mybatis-plus-annotation</artifactId>
+            <version>${mybatis-plus.version}</version>
+        </dependency>
         <dependency><groupId>org.projectlombok</groupId><artifactId>lombok</artifactId><optional>true</optional></dependency>
         <dependency><groupId>jakarta.validation</groupId><artifactId>jakarta.validation-api</artifactId></dependency>
     </dependencies>

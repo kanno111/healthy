@@ -53,6 +53,32 @@
         WHERE id = #{id} AND patient_id = #{patientId} AND status = 'BOOKED'
     </update>
 
+    <select id="findById" resultType="com.healthy.appointment.entity.Appointment">
+        SELECT id, appointment_no, request_id, patient_id, doctor_id, schedule_slot_id,
+               schedule_date, start_time, end_time, status, created_at
+        FROM appointment WHERE id = #{id}
+    </select>
+
+    <update id="completeBooked">
+        UPDATE appointment SET status = 'COMPLETED'
+        WHERE id = #{id} AND status = 'BOOKED'
+    </update>
+
+    <select id="listForAdmin" resultType="com.healthy.appointment.vo.AdminAppointmentVO">
+        SELECT appointment.id, appointment.appointment_no,
+               patient.real_name AS patient_name,
+               doctor.name AS doctor_name, department.name AS department_name,
+               appointment.schedule_date, slot.session_name,
+               appointment.start_time, appointment.end_time,
+               appointment.status, appointment.created_at
+        FROM appointment
+        INNER JOIN patient ON patient.id = appointment.patient_id
+        INNER JOIN doctor ON doctor.id = appointment.doctor_id
+        INNER JOIN department ON department.id = doctor.department_id
+        LEFT JOIN doctor_schedule_slot slot ON slot.id = appointment.schedule_slot_id
+        ORDER BY appointment.schedule_date DESC, appointment.start_time DESC, appointment.id DESC
+    </select>
+
     <select id="findByIdAndPatientId" resultType="com.healthy.appointment.vo.PatientAppointmentVO">
         SELECT <include refid="patientAppointmentColumns"/>
         FROM appointment

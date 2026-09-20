@@ -1,8 +1,10 @@
 package com.healthy.appointment.service.impl;
 
+import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.healthy.appointment.dto.AppointmentCreateDTO;
 import com.healthy.appointment.entity.Appointment;
 import com.healthy.appointment.entity.DoctorScheduleSlot;
+import com.healthy.appointment.entity.Patient;
 import com.healthy.appointment.enumeration.ErrorCode;
 import com.healthy.appointment.exception.BusinessException;
 import com.healthy.appointment.mapper.AppointmentMapper;
@@ -10,6 +12,7 @@ import com.healthy.appointment.mapper.DoctorScheduleSlotMapper;
 import com.healthy.appointment.mapper.PatientMapper;
 import com.healthy.appointment.service.AppointmentService;
 import com.healthy.appointment.service.AppointmentStockService;
+import com.healthy.appointment.vo.AdminAppointmentVO;
 import com.healthy.appointment.vo.PatientAppointmentVO;
 import lombok.RequiredArgsConstructor;
 import org.springframework.dao.DuplicateKeyException;
@@ -109,12 +112,37 @@ public class AppointmentServiceImpl implements AppointmentService {
         preDeductRedisStockIfTransactionDoesNotCommit(appointment.getScheduleSlotId());
     }
 
-    private Long findEnabledPatientId(Long userId) {
-        Long patientId = patientMapper.findEnabledIdByUserId(userId);
-        if (patientId == null) {
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public void complete(Long appointmentId) {
+        Appointment appointment = appointmentMapper.findById(appointmentId);
+        if (appointment == null) {
             throw new BusinessException(ErrorCode.NOT_FOUND);
         }
-        return patientId;
+        if (!APPOINTMENT_STATUS_BOOKED.equals(appointment.getStatus()) || !hasStarted(appointment)) {
+            throw new BusinessException(ErrorCode.CONFLICT);
+        }
+        // Conditional update prevents concurrent completion/cancellation from crossing the state boundary twice.
+        if (appointmentMapper.completeBooked(appointmentId) != 1) {
+            throw new BusinessException(ErrorCode.CONFLICT);
+        }
+    }
+
+    @Override
+    public List<AdminAppointmentVO> listForAdmin() {
+        return appointmentMapper.listForAdmin();
+    }
+
+    private Long findEnabledPatientId(Long userId) {
+        Patient patient = patientMapper.selectOne(new LambdaQueryWrapper<Patient>()
+                .select(Patient::getId)
+                .eq(Patient::getUserId, userId)
+                .eq(Patient::getStatus, 1)
+                .last("LIMIT 1"));
+        if (patient == null) {
+            throw new BusinessException(ErrorCode.NOT_FOUND);
+        }
+        return patient.getId();
     }
 
     private DoctorScheduleSlot getAvailableSlot(Long slotId) {
@@ -172,5 +200,12 @@ public class AppointmentServiceImpl implements AppointmentService {
                 && !appointment.getStartTime().isAfter(now.toLocalTime()))) {
             throw new BusinessException(ErrorCode.CONFLICT);
         }
+    }
+
+    private boolean hasStarted(Appointment appointment) {
+        LocalDateTime now = LocalDateTime.now();
+        return appointment.getScheduleDate().isBefore(now.toLocalDate())
+                || (appointment.getScheduleDate().equals(now.toLocalDate())
+                && !appointment.getStartTime().isAfter(now.toLocalTime()));
     }
 }

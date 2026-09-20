@@ -1,6 +1,7 @@
 package com.healthy.appointment.mapper;
 
 import com.healthy.appointment.entity.Appointment;
+import com.healthy.appointment.vo.AdminAppointmentVO;
 import com.healthy.appointment.vo.PatientAppointmentVO;
 import org.apache.ibatis.annotations.Param;
 
@@ -22,6 +23,12 @@ public interface AppointmentMapper {
     Appointment findEntityByIdAndPatientId(@Param("id") Long id, @Param("patientId") Long patientId);
 
     int cancelBooked(@Param("id") Long id, @Param("patientId") Long patientId);
+
+    Appointment findById(@Param("id") Long id);
+
+    int completeBooked(@Param("id") Long id);
+
+    List<AdminAppointmentVO> listForAdmin();
 
     PatientAppointmentVO findByIdAndPatientId(@Param("id") Long id, @Param("patientId") Long patientId);
 

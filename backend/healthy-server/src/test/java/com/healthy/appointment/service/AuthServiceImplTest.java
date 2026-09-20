@@ -52,7 +52,7 @@ class AuthServiceImplTest {
     @Test
     void loginReturnsTokenWhenCredentialsAreCorrect() {
         SysUser user = enabledUser();
-        when(sysUserMapper.findEnabledByUsername("patient_demo")).thenReturn(user);
+        when(sysUserMapper.selectOne(any())).thenReturn(user);
 
         LoginVO result = authService.login(loginRequest("patient_demo", "123456"));
 
@@ -64,7 +64,7 @@ class AuthServiceImplTest {
 
     @Test
     void loginFailsWhenPasswordIsIncorrect() {
-        when(sysUserMapper.findEnabledByUsername("patient_demo")).thenReturn(enabledUser());
+        when(sysUserMapper.selectOne(any())).thenReturn(enabledUser());
 
         assertThatThrownBy(() -> authService.login(loginRequest("patient_demo", "wrong-password")))
                 .isInstanceOf(BusinessException.class)

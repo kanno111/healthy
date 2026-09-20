@@ -30,7 +30,6 @@ class DepartmentServiceImplTest {
     @Test
     void createTrimsNameAndUsesDefaultSortOrder() {
         DepartmentService service = new DepartmentServiceImpl(departmentMapper);
-        when(departmentMapper.existsByName("cardiology", null)).thenReturn(false);
         doAnswer(invocation -> {
             invocation.getArgument(0, Department.class).setId(10L);
             return 1;
@@ -48,7 +47,7 @@ class DepartmentServiceImplTest {
     @Test
     void createRejectsDuplicateName() {
         DepartmentService service = new DepartmentServiceImpl(departmentMapper);
-        when(departmentMapper.existsByName("cardiology", null)).thenReturn(true);
+        when(departmentMapper.exists(any())).thenReturn(true);
 
         assertThatThrownBy(() -> service.create(saveRequest("cardiology", 1)))
                 .isInstanceOf(BusinessException.class);
@@ -69,7 +68,7 @@ class DepartmentServiceImplTest {
 
         service.updateStatus(1L, 0);
 
-        verify(departmentMapper).updateStatus(1L, 0);
+        verify(departmentMapper).update(org.mockito.ArgumentMatchers.isNull(), any());
     }
 
     private DepartmentSaveDTO saveRequest(String name, Integer sortOrder) {
