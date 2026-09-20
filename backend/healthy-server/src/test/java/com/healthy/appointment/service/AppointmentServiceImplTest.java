@@ -26,8 +26,12 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
+import static com.healthy.appointment.service.AppointmentStockService.PreDeductResult.EMPTY;
+import static com.healthy.appointment.service.AppointmentStockService.PreDeductResult.MISSING;
+import static com.healthy.appointment.service.AppointmentStockService.PreDeductResult.SUCCESS;
 
 @ExtendWith(MockitoExtension.class)
 class AppointmentServiceImplTest {
@@ -41,6 +45,9 @@ class AppointmentServiceImplTest {
     @Mock
     private AppointmentStockService appointmentStockService;
 
+    @Mock
+    private AppointmentStockRepairService appointmentStockRepairService;
+
     @Test
     void createDecreasesCapacityAndCreatesBookedAppointment() {
         AppointmentService service = createService();
@@ -52,7 +59,7 @@ class AppointmentServiceImplTest {
 
         when(patientMapper.selectOne(any())).thenReturn(enabledPatient(5L));
         when(doctorScheduleSlotMapper.findById(10L)).thenReturn(slot);
-        when(appointmentStockService.preDeduct(10L)).thenReturn(true);
+        when(appointmentStockService.preDeduct(10L)).thenReturn(SUCCESS);
         when(doctorScheduleSlotMapper.decreaseRemainingCapacity(10L)).thenReturn(1);
         doAnswer(invocation -> {
             invocation.getArgument(0, Appointment.class).setId(20L);
@@ -77,7 +84,7 @@ class AppointmentServiceImplTest {
     void createRejectsFullSlotBeforeDecreasingCapacity() {
         AppointmentService service = createService();
         DoctorScheduleSlot slot = availableSlot(10L, 0);
-        when(appointmentStockService.preDeduct(10L)).thenReturn(true);
+        when(appointmentStockService.preDeduct(10L)).thenReturn(SUCCESS);
         when(patientMapper.selectOne(any())).thenReturn(enabledPatient(5L));
         when(doctorScheduleSlotMapper.findById(10L)).thenReturn(slot);
 
@@ -92,25 +99,61 @@ class AppointmentServiceImplTest {
         AppointmentService service = createService();
         when(patientMapper.selectOne(any())).thenReturn(enabledPatient(5L));
         when(doctorScheduleSlotMapper.findById(10L)).thenReturn(availableSlot(10L, 1));
-        when(appointmentStockService.preDeduct(10L)).thenReturn(true);
+        when(appointmentStockService.preDeduct(10L)).thenReturn(SUCCESS);
         when(doctorScheduleSlotMapper.decreaseRemainingCapacity(10L)).thenReturn(0);
 
         assertThatThrownBy(() -> service.create(1L, request(10L))).isInstanceOf(BusinessException.class);
 
         verify(appointmentMapper, never()).insert(any());
+        verify(appointmentStockRepairService).triggerAfterMysqlStockReject(10L);
     }
 
     @Test
     void createRejectsWhenRedisStockIsInsufficientWithoutChangingInventory() {
         AppointmentService service = createService();
         when(patientMapper.selectOne(any())).thenReturn(enabledPatient(5L));
-        when(appointmentStockService.preDeduct(10L)).thenReturn(false);
+        when(appointmentStockService.preDeduct(10L)).thenReturn(EMPTY);
 
         assertThatThrownBy(() -> service.create(1L, request(10L))).isInstanceOf(BusinessException.class);
 
         verify(doctorScheduleSlotMapper, never()).findById(10L);
         verify(doctorScheduleSlotMapper, never()).decreaseRemainingCapacity(10L);
         verify(appointmentMapper, never()).insert(any());
+        verify(appointmentStockRepairService).triggerIfEmpty(10L);
+    }
+
+    @Test
+    void createReloadsMissingRedisStockWithSetNxAndRetriesLuaOnce() {
+        AppointmentService service = createService();
+        PatientAppointmentVO expected = new PatientAppointmentVO();
+        expected.setId(20L);
+        when(patientMapper.selectOne(any())).thenReturn(enabledPatient(5L));
+        when(doctorScheduleSlotMapper.findById(10L)).thenReturn(availableSlot(10L, 2));
+        when(appointmentStockService.preDeduct(10L)).thenReturn(MISSING, SUCCESS);
+        when(doctorScheduleSlotMapper.decreaseRemainingCapacity(10L)).thenReturn(1);
+        doAnswer(invocation -> {
+            invocation.getArgument(0, Appointment.class).setId(20L);
+            return 1;
+        }).when(appointmentMapper).insert(any(Appointment.class));
+        when(appointmentMapper.findByIdAndPatientId(20L, 5L)).thenReturn(expected);
+
+        assertThat(service.create(1L, request(10L))).isSameAs(expected);
+
+        verify(appointmentStockService).initializeIfAbsent(10L, 2);
+        verify(appointmentStockService, times(2)).preDeduct(10L);
+    }
+
+    @Test
+    void createRejectsMissingRedisStockWhenMysqlHasNoRemainingCapacity() {
+        AppointmentService service = createService();
+        when(patientMapper.selectOne(any())).thenReturn(enabledPatient(5L));
+        when(appointmentStockService.preDeduct(10L)).thenReturn(MISSING);
+        when(doctorScheduleSlotMapper.findById(10L)).thenReturn(availableSlot(10L, 0));
+
+        assertThatThrownBy(() -> service.create(1L, request(10L))).isInstanceOf(BusinessException.class);
+
+        verify(appointmentStockService, never()).initializeIfAbsent(10L, 0);
+        verify(appointmentStockService, times(1)).preDeduct(10L);
     }
 
     @Test
@@ -151,7 +194,7 @@ class AppointmentServiceImplTest {
         AppointmentService service = createService();
         when(patientMapper.selectOne(any())).thenReturn(enabledPatient(5L));
         when(doctorScheduleSlotMapper.findById(10L)).thenReturn(availableSlot(10L, 1));
-        when(appointmentStockService.preDeduct(10L)).thenReturn(true);
+        when(appointmentStockService.preDeduct(10L)).thenReturn(SUCCESS);
         when(doctorScheduleSlotMapper.decreaseRemainingCapacity(10L)).thenReturn(0);
 
         TransactionSynchronizationManager.initSynchronization();
@@ -164,10 +207,12 @@ class AppointmentServiceImplTest {
         }
 
         verify(appointmentStockService).restore(10L);
+        verify(appointmentStockRepairService).triggerAfterMysqlStockReject(10L);
     }
 
     private AppointmentService createService() {
-        return new AppointmentServiceImpl(patientMapper, doctorScheduleSlotMapper, appointmentMapper, appointmentStockService);
+        return new AppointmentServiceImpl(patientMapper, doctorScheduleSlotMapper, appointmentMapper,
+                appointmentStockService, appointmentStockRepairService);
     }
 
     private AppointmentCreateDTO request(Long slotId) {

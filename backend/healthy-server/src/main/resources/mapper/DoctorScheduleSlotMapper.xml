@@ -89,6 +89,8 @@
         SET remaining_capacity = #{capacity} - (total_capacity - remaining_capacity),
             total_capacity = #{capacity},
             version = version + 1
-        WHERE id = #{id} AND version = #{version}
+        WHERE id = #{id}
+          AND version = #{version}
+          AND #{capacity} &gt;= total_capacity - remaining_capacity
     </update>
 </mapper>

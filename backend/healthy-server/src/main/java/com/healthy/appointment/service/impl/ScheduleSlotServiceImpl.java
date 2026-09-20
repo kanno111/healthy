@@ -99,8 +99,12 @@ public class ScheduleSlotServiceImpl implements ScheduleSlotService {
         if (doctorScheduleSlotMapper.updateCapacity(id, capacity, slot.getVersion()) != 1) {
             throw new BusinessException(ErrorCode.CONFLICT);
         }
-        int remainingCapacity = capacity - bookedCapacity;
-        runAfterCommit(() -> appointmentStockService.initialize(id, remainingCapacity));
+        int delta = capacity - slot.getTotalCapacity();
+        if (delta != 0) {
+            // INCRBY 与患者的 Lua DECR 可交换，避免提交后的 SET 覆盖并发扣减。
+            // Key 缺失时不创建，后续挂号会按 MISSING 路径以 MySQL 数据懒加载。
+            runAfterCommit(() -> appointmentStockService.adjustByDeltaIfPresent(id, delta));
+        }
     }
 
     private void validateDoctor(Long doctorId) {

@@ -20,6 +20,8 @@ import java.util.List;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyInt;
+import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -91,6 +93,45 @@ class ScheduleSlotServiceImplTest {
         verify(doctorScheduleSlotMapper, never()).batchInsert(any());
     }
 
+    @Test
+    void updateCapacityUsesPositiveDeltaInsteadOfOverwritingConcurrentRedisDeduction() {
+        ScheduleSlotService service = new ScheduleSlotServiceImpl(doctorService, doctorScheduleSlotMapper, appointmentStockService);
+        when(doctorScheduleSlotMapper.findById(10L)).thenReturn(slot(10L, 6, 2));
+        when(doctorScheduleSlotMapper.updateCapacity(10L, 15, 2)).thenReturn(1);
+
+        service.updateCapacity(10L, 15);
+
+        verify(appointmentStockService).adjustByDeltaIfPresent(10L, 5);
+        verify(appointmentStockService, never()).initialize(10L, 11);
+    }
+
+    @Test
+    void updateCapacityUsesNegativeDeltaInsteadOfOverwritingConcurrentRedisDeduction() {
+        ScheduleSlotService service = new ScheduleSlotServiceImpl(doctorService, doctorScheduleSlotMapper, appointmentStockService);
+        // 已预约 4 个，缩容至 8 仍合法；Redis 仅原子减 2，不会 SET 覆盖并发 DECR。
+        when(doctorScheduleSlotMapper.findById(10L)).thenReturn(slot(10L, 6, 2));
+        when(doctorScheduleSlotMapper.updateCapacity(10L, 8, 2)).thenReturn(1);
+
+        service.updateCapacity(10L, 8);
+
+        verify(appointmentStockService).adjustByDeltaIfPresent(10L, -2);
+    }
+
+    @Test
+    void updateCapacityLeavesMissingRedisKeyForLazyReload() {
+        ScheduleSlotService service = new ScheduleSlotServiceImpl(doctorService, doctorScheduleSlotMapper, appointmentStockService);
+        when(doctorScheduleSlotMapper.findById(10L)).thenReturn(slot(10L, 6, 2));
+        when(doctorScheduleSlotMapper.updateCapacity(10L, 12, 2)).thenReturn(1);
+        // false 表示 Lua 发现 Redis key 缺失，服务层不 SET 新值。
+        when(appointmentStockService.adjustByDeltaIfPresent(10L, 2)).thenReturn(false);
+
+        service.updateCapacity(10L, 12);
+
+        verify(appointmentStockService).adjustByDeltaIfPresent(10L, 2);
+        verify(appointmentStockService, never()).initialize(10L, 8);
+        verify(appointmentStockService, never()).initializeIfAbsent(anyLong(), anyInt());
+    }
+
     private ScheduleBatchDTO request(LocalDate date, LocalTime startTime, LocalTime endTime) {
         ScheduleBatchDTO request = new ScheduleBatchDTO();
         request.setDoctorId(1L);
@@ -116,5 +157,14 @@ class ScheduleSlotServiceImplTest {
         doctor.setId(1L);
         doctor.setStatus(1);
         return doctor;
+    }
+
+    private DoctorScheduleSlot slot(Long id, int remainingCapacity, int version) {
+        DoctorScheduleSlot slot = new DoctorScheduleSlot();
+        slot.setId(id);
+        slot.setTotalCapacity(10);
+        slot.setRemainingCapacity(remainingCapacity);
+        slot.setVersion(version);
+        return slot;
     }
 }

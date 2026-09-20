@@ -12,6 +12,7 @@ import com.healthy.appointment.mapper.DoctorScheduleSlotMapper;
 import com.healthy.appointment.mapper.PatientMapper;
 import com.healthy.appointment.service.AppointmentService;
 import com.healthy.appointment.service.AppointmentStockService;
+import com.healthy.appointment.service.AppointmentStockRepairService;
 import com.healthy.appointment.vo.AdminAppointmentVO;
 import com.healthy.appointment.vo.PatientAppointmentVO;
 import lombok.RequiredArgsConstructor;
@@ -28,6 +29,9 @@ import java.util.UUID;
 
 import static com.healthy.appointment.constant.Constant.APPOINTMENT_STATUS_BOOKED;
 import static com.healthy.appointment.constant.Constant.SCHEDULE_STATUS_OPEN;
+import static com.healthy.appointment.service.AppointmentStockService.PreDeductResult.EMPTY;
+import static com.healthy.appointment.service.AppointmentStockService.PreDeductResult.MISSING;
+import static com.healthy.appointment.service.AppointmentStockService.PreDeductResult.SUCCESS;
 
 @Service
 @RequiredArgsConstructor
@@ -36,6 +40,7 @@ public class AppointmentServiceImpl implements AppointmentService {
     private final DoctorScheduleSlotMapper doctorScheduleSlotMapper;
     private final AppointmentMapper appointmentMapper;
     private final AppointmentStockService appointmentStockService;
+    private final AppointmentStockRepairService appointmentStockRepairService;
 
 
     /** 创建最小预约记录，并同步扣减对应班次的剩余号源。 */
@@ -54,13 +59,17 @@ public class AppointmentServiceImpl implements AppointmentService {
         if (existingActiveAppointment != null) {
             return existingActiveAppointment;
         }
-        if (!appointmentStockService.preDeduct(slotId)) {
+        if (preDeductWithReload(slotId) != SUCCESS) {
+            appointmentStockRepairService.triggerIfEmpty(slotId);
             throw new BusinessException(ErrorCode.CONFLICT);
         }
         restoreRedisStockIfTransactionDoesNotCommit(slotId);
         DoctorScheduleSlot slot = getAvailableSlot(slotId);
         //校验影响行数，确保未抢到号时立刻抛出异常
         if (doctorScheduleSlotMapper.decreaseRemainingCapacity(slot.getId()) != 1) {
+            // Redis 已预扣但 MySQL 最终条件校验失败。事务回滚回调会恢复 Redis；
+            // 同时延迟校验是否仍存在 Redis 偏大，不在当前请求直接覆盖缓存。
+            appointmentStockRepairService.triggerAfterMysqlStockReject(slotId);
             throw new BusinessException(ErrorCode.CONFLICT);
         }
 
@@ -159,6 +168,29 @@ public class AppointmentServiceImpl implements AppointmentService {
             throw new BusinessException(ErrorCode.CONFLICT);
         }
         return slot;
+    }
+
+    /**
+     * Redis key 丢失时以 MySQL 为事实来源做一次 SETNX 重建，并且只重试一次 Lua 预扣。
+     * SETNX 失败说明并发请求已经完成重建，直接重试 Lua 即可，绝不能覆盖库存。
+     */
+    private AppointmentStockService.PreDeductResult preDeductWithReload(Long slotId) {
+        AppointmentStockService.PreDeductResult result = appointmentStockService.preDeduct(slotId);
+        if (result != MISSING) {
+            return result;
+        }
+        reloadStockIfMissing(slotId);
+        result = appointmentStockService.preDeduct(slotId);
+        if (result == MISSING) {
+            // 已经做过一次 SETNX 和一次 Lua 重试，继续重试只会掩盖 Redis 异常。
+            throw new BusinessException(ErrorCode.INTERNAL_ERROR);
+        }
+        return result;
+    }
+
+    private void reloadStockIfMissing(Long slotId) {
+        DoctorScheduleSlot slot = getAvailableSlot(slotId);
+        appointmentStockService.initializeIfAbsent(slotId, slot.getRemainingCapacity());
     }
 
     private void restoreRedisStockIfTransactionDoesNotCommit(Long slotId) {

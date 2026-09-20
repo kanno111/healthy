@@ -21,3 +21,8 @@ logging:
 jwt:
   secret: ${JWT_SECRET:healthy-appointment-local-development-secret-key-2026}
   ttl: PT24H
+
+appointment:
+  stock:
+    repair-delay: 3s
+    repair-check-ttl: 8s
