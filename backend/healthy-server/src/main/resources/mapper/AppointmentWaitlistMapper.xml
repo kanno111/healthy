@@ -1,0 +1,42 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.healthy.appointment.mapper.AppointmentWaitlistMapper">
+    <sql id="patientWaitlistColumns">
+        waitlist.id, waitlist.schedule_slot_id, waitlist.status,
+        waitlist.offer_expire_time, waitlist.created_at, waitlist.updated_at,
+        doctor.name AS doctor_name, department.name AS department_name,
+        slot.schedule_date, slot.session_name, slot.start_time, slot.end_time
+    </sql>
+
+    <select id="selectFirstWaitingForUpdate" resultType="com.healthy.appointment.entity.AppointmentWaitlist">
+        SELECT id, patient_id, schedule_slot_id, status, offer_expire_time, created_at, updated_at
+        FROM appointment_waitlist
+        WHERE schedule_slot_id = #{scheduleSlotId}
+          AND status = 'WAITING'
+        ORDER BY created_at ASC, id ASC
+        LIMIT 1
+        FOR UPDATE
+    </select>
+
+    <select id="listByPatientId" resultType="com.healthy.appointment.vo.PatientAppointmentWaitlistVO">
+        SELECT <include refid="patientWaitlistColumns"/>
+        FROM appointment_waitlist waitlist
+        INNER JOIN doctor_schedule_slot slot ON slot.id = waitlist.schedule_slot_id
+        INNER JOIN doctor ON doctor.id = slot.doctor_id
+        INNER JOIN department ON department.id = doctor.department_id
+        WHERE waitlist.patient_id = #{patientId}
+        ORDER BY waitlist.created_at DESC, waitlist.id DESC
+    </select>
+
+    <select id="findByIdAndPatientId" resultType="com.healthy.appointment.vo.PatientAppointmentWaitlistVO">
+        SELECT <include refid="patientWaitlistColumns"/>
+        FROM appointment_waitlist waitlist
+        INNER JOIN doctor_schedule_slot slot ON slot.id = waitlist.schedule_slot_id
+        INNER JOIN doctor ON doctor.id = slot.doctor_id
+        INNER JOIN department ON department.id = doctor.department_id
+        WHERE waitlist.id = #{id}
+          AND waitlist.patient_id = #{patientId}
+    </select>
+</mapper>

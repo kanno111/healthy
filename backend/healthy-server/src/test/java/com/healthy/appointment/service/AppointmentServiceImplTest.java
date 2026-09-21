@@ -47,6 +47,8 @@ class AppointmentServiceImplTest {
 
     @Mock
     private AppointmentStockRepairService appointmentStockRepairService;
+    @Mock
+    private AppointmentWaitlistService appointmentWaitlistService;
 
     @Test
     void createDecreasesCapacityAndCreatesBookedAppointment() {
@@ -210,9 +212,39 @@ class AppointmentServiceImplTest {
         verify(appointmentStockRepairService).triggerAfterMysqlStockReject(10L);
     }
 
+    @Test
+    void cancelOffersFreedSlotToWaitingPatientWithoutRestoringPublicStock() {
+        AppointmentService service = createService();
+        when(patientMapper.selectOne(any())).thenReturn(enabledPatient(5L));
+        when(appointmentMapper.findEntityByIdAndPatientId(20L, 5L)).thenReturn(cancellableAppointment(20L, 10L));
+        when(appointmentMapper.cancelBooked(20L, 5L)).thenReturn(1);
+        when(appointmentWaitlistService.offerFirstWaiting(10L)).thenReturn(true);
+
+        service.cancel(1L, 20L);
+
+        verify(appointmentWaitlistService).offerFirstWaiting(10L);
+        verify(doctorScheduleSlotMapper, never()).increaseRemainingCapacity(10L);
+        verify(appointmentStockService, never()).restore(10L);
+    }
+
+    @Test
+    void cancelRestoresPublicStockOnlyWhenNoWaitingPatientExists() {
+        AppointmentService service = createService();
+        when(patientMapper.selectOne(any())).thenReturn(enabledPatient(5L));
+        when(appointmentMapper.findEntityByIdAndPatientId(20L, 5L)).thenReturn(cancellableAppointment(20L, 10L));
+        when(appointmentMapper.cancelBooked(20L, 5L)).thenReturn(1);
+        when(appointmentWaitlistService.offerFirstWaiting(10L)).thenReturn(false);
+        when(doctorScheduleSlotMapper.increaseRemainingCapacity(10L)).thenReturn(1);
+
+        service.cancel(1L, 20L);
+
+        verify(doctorScheduleSlotMapper).increaseRemainingCapacity(10L);
+        verify(appointmentStockService).restore(10L);
+    }
+
     private AppointmentService createService() {
         return new AppointmentServiceImpl(patientMapper, doctorScheduleSlotMapper, appointmentMapper,
-                appointmentStockService, appointmentStockRepairService);
+                appointmentStockService, appointmentStockRepairService, appointmentWaitlistService);
     }
 
     private AppointmentCreateDTO request(Long slotId) {
@@ -239,5 +271,16 @@ class AppointmentServiceImplTest {
         patient.setId(id);
         patient.setStatus(1);
         return patient;
+    }
+
+    private Appointment cancellableAppointment(Long id, Long slotId) {
+        Appointment appointment = new Appointment();
+        appointment.setId(id);
+        appointment.setPatientId(5L);
+        appointment.setScheduleSlotId(slotId);
+        appointment.setStatus("BOOKED");
+        appointment.setScheduleDate(LocalDate.now().plusDays(1));
+        appointment.setStartTime(LocalTime.of(8, 0));
+        return appointment;
     }
 }

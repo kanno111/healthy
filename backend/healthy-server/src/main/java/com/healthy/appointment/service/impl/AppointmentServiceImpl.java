@@ -13,6 +13,7 @@ import com.healthy.appointment.mapper.PatientMapper;
 import com.healthy.appointment.service.AppointmentService;
 import com.healthy.appointment.service.AppointmentStockService;
 import com.healthy.appointment.service.AppointmentStockRepairService;
+import com.healthy.appointment.service.AppointmentWaitlistService;
 import com.healthy.appointment.vo.AdminAppointmentVO;
 import com.healthy.appointment.vo.PatientAppointmentVO;
 import lombok.RequiredArgsConstructor;
@@ -41,6 +42,7 @@ public class AppointmentServiceImpl implements AppointmentService {
     private final AppointmentMapper appointmentMapper;
     private final AppointmentStockService appointmentStockService;
     private final AppointmentStockRepairService appointmentStockRepairService;
+    private final AppointmentWaitlistService appointmentWaitlistService;
 
 
     /** 创建最小预约记录，并同步扣减对应班次的剩余号源。 */
@@ -113,6 +115,10 @@ public class AppointmentServiceImpl implements AppointmentService {
         // Only one concurrent request can move BOOKED to CANCELLED and restore capacity.
         if (appointmentMapper.cancelBooked(appointmentId, patientId) != 1) {
             throw new BusinessException(ErrorCode.CONFLICT);
+        }
+        // A freed slot is reserved for the FIFO waitlist before it can ever enter public stock.
+        if (appointmentWaitlistService.offerFirstWaiting(appointment.getScheduleSlotId())) {
+            return;
         }
         if (doctorScheduleSlotMapper.increaseRemainingCapacity(appointment.getScheduleSlotId()) != 1) {
             throw new BusinessException(ErrorCode.CONFLICT);

@@ -26,3 +26,6 @@ appointment:
   stock:
     repair-delay: 3s
     repair-check-ttl: 8s
+  waitlist:
+    offer-duration: 10s
+    offer-expire-check-delay: 2s

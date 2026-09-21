@@ -3,6 +3,7 @@ import { computed, onMounted, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ApiError } from '../api/auth'
 import { patientResourceApi, type PatientDoctor, type PatientScheduleSlot } from '../api/patient-resource'
+import { waitlistApi } from '../api/waitlist'
 import { session } from '../stores/session'
 
 const route = useRoute()
@@ -12,6 +13,8 @@ const doctor = ref<PatientDoctor | null>(null)
 const slots = ref<PatientScheduleSlot[]>([])
 const loading = ref(false)
 const errorMessage = ref('')
+const waitlistMessage = ref('')
+const joiningWaitlistSlotId = ref<number | null>(null)
 
 function addDays(source: Date, days: number) {
   const date = new Date(source)
@@ -66,12 +69,29 @@ function goToConfirm(slot: PatientScheduleSlot) {
     query: { doctorId: String(doctor.value.id), slotId: String(slot.id) }
   })
 }
+
+async function joinWaitlist(slot: PatientScheduleSlot) {
+  if (!session.token || slot.remainingCapacity > 0 || joiningWaitlistSlotId.value !== null) return
+  if (!window.confirm(`该班次已满，确认加入 ${slot.sessionName} 候补吗？`)) return
+  joiningWaitlistSlotId.value = slot.id
+  errorMessage.value = ''
+  waitlistMessage.value = ''
+  try {
+    const waitlist = await waitlistApi.join(session.token, slot.id)
+    waitlistMessage.value = `已加入候补（记录 #${waitlist.id}），可在“我的候补”中查看。`
+  } catch (error) {
+    errorMessage.value = error instanceof ApiError ? error.message : '加入候补失败，请稍后重试'
+  } finally {
+    joiningWaitlistSlotId.value = null
+  }
+}
 </script>
 
 <template>
   <div class="page-section patient-doctor-page">
     <p class="crumb">预约挂号 / {{ doctor?.departmentName ?? '医生详情' }} / 查看号源</p>
     <p v-if="errorMessage" class="alert">{{ errorMessage }}</p>
+    <p v-if="waitlistMessage" class="tip">{{ waitlistMessage }}</p>
     <div v-if="loading" class="patient-resource-loading">正在加载医生与号源…</div>
     <template v-else-if="doctor">
       <section class="doctor-hero">
@@ -88,7 +108,8 @@ function goToConfirm(slot: PatientScheduleSlot) {
           <div v-for="slot in selectedSlots" :key="slot.id" class="slot">
             <div><b>{{ slot.sessionName }} · {{ slot.startTime.slice(0, 5) }}–{{ slot.endTime.slice(0, 5) }}</b><p>总号源 {{ slot.totalCapacity }}，当前剩余 {{ slot.remainingCapacity }}</p></div>
             <span :class="slot.remainingCapacity > 0 ? 'available' : 'full'">{{ slot.remainingCapacity > 0 ? `剩余 ${slot.remainingCapacity} 号` : '已约满' }}</span>
-            <button :disabled="slot.remainingCapacity < 1" @click="goToConfirm(slot)">{{ slot.remainingCapacity > 0 ? '预约' : '已约满' }}</button>
+            <button v-if="slot.remainingCapacity > 0" @click="goToConfirm(slot)">预约</button>
+            <button v-else class="secondary" :disabled="joiningWaitlistSlotId === slot.id" @click="joinWaitlist(slot)">{{ joiningWaitlistSlotId === slot.id ? '加入中…' : '加入候补' }}</button>
           </div>
         </div>
         <div v-else class="patient-slot-empty">当天暂无开放号源，请选择其他日期</div>

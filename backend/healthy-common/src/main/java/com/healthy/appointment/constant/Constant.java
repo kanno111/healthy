@@ -33,4 +33,19 @@ public final class Constant {
 
     /** 患者已完成就诊。 */
     public static final String APPOINTMENT_STATUS_COMPLETED = "COMPLETED";
+
+    /** 患者正在等待班次释放号源。 */
+    public static final String WAITLIST_STATUS_WAITING = "WAITING";
+
+    /** 患者已获得限时确认名额。 */
+    public static final String WAITLIST_STATUS_OFFERED = "OFFERED";
+
+    /** 候补名额已确认并完成挂号。 */
+    public static final String WAITLIST_STATUS_CONFIRMED = "CONFIRMED";
+
+    /** 候补 offer 已超时。 */
+    public static final String WAITLIST_STATUS_EXPIRED = "EXPIRED";
+
+    /** 患者主动取消候补。 */
+    public static final String WAITLIST_STATUS_CANCELLED = "CANCELLED";
 }
