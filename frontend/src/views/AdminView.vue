@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onMounted, reactive, ref, watch } from 'vue'
+import { computed, onBeforeUnmount, onMounted, reactive, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { doctors } from '../api/mock'
 import { ApiError, logout as logoutRequest } from '../api/auth'
@@ -7,6 +7,7 @@ import { departmentApi, type Department } from '../api/department'
 import { doctorApi, type Doctor } from '../api/doctor'
 import { scheduleApi, type ScheduleBatchPayload, type ScheduleSessionPayload, type ScheduleSessionType, type ScheduleSlot } from '../api/schedule'
 import { adminAppointmentApi, type AdminAppointment } from '../api/admin-appointment'
+import { adminWaitlistApi, type AdminWaitlistRecord, type WaitlistSlotQueue, type WaitlistStatus } from '../api/admin-waitlist'
 import { session, signOut } from '../stores/session'
 
 const router = useRouter()
@@ -48,6 +49,23 @@ const adminAppointments = ref<AdminAppointment[]>([])
 const loadingAppointments = ref(false)
 const appointmentError = ref('')
 const completingAppointmentId = ref<number | null>(null)
+const waitlistRecords = ref<AdminWaitlistRecord[]>([])
+const waitlistPage = ref(1)
+const waitlistPageSize = ref(10)
+const waitlistTotal = ref(0)
+const waitlistTotalPages = ref(0)
+const loadingWaitlists = ref(false)
+const waitlistError = ref('')
+const waitlistFilterDoctors = ref<Doctor[]>([])
+const loadingWaitlistDoctors = ref(false)
+const waitlistFilters = reactive({ status: '', scheduleDate: '', departmentId: 0, doctorId: 0, patientKeyword: '' })
+const selectedWaitlistRecord = ref<AdminWaitlistRecord | null>(null)
+const selectedWaitlistQueue = ref<WaitlistSlotQueue | null>(null)
+const loadingWaitlistQueue = ref(false)
+const waitlistQueueError = ref('')
+const waitlistNow = ref(Date.now())
+const refreshedExpiredOfferIds = new Set<number>()
+let waitlistCountdownTimer: number | undefined
 const weekdayOptions = [
   { value: 1, label: '一' }, { value: 2, label: '二' }, { value: 3, label: '三' }, { value: 4, label: '四' },
   { value: 5, label: '五' }, { value: 6, label: '六' }, { value: 7, label: '日' }
@@ -452,6 +470,133 @@ async function completeAppointment(item: AdminAppointment) {
   }
 }
 
+const waitlistStatusText: Record<WaitlistStatus, string> = {
+  WAITING: '排队中', OFFERED: '待确认', CONFIRMED: '候补成功', EXPIRED: '已过期', CANCELLED: '已取消'
+}
+
+function formatDateTime(value: string | null | undefined) {
+  return value ? value.replace('T', ' ').slice(0, 19) : '-'
+}
+
+function waitlistCountdown(expireTime: string | null) {
+  if (!expireTime) return '-'
+  const seconds = Math.max(0, Math.ceil((new Date(expireTime).getTime() - waitlistNow.value) / 1000))
+  const minutes = Math.floor(seconds / 60)
+  return `${String(minutes).padStart(2, '0')}:${String(seconds % 60).padStart(2, '0')}`
+}
+
+function waitlistFlow(record: AdminWaitlistRecord) {
+  const flow: WaitlistStatus[] = ['WAITING']
+  if (record.status !== 'WAITING' && record.status !== 'CANCELLED') flow.push('OFFERED')
+  if (record.status === 'CANCELLED') flow.push('CANCELLED')
+  if (record.status === 'CONFIRMED') flow.push('CONFIRMED')
+  if (record.status === 'EXPIRED') flow.push('EXPIRED')
+  return flow
+}
+
+async function loadWaitlistFilterDoctors() {
+  if (!session.token) return
+  loadingWaitlistDoctors.value = true
+  try {
+    const result = await doctorApi.list(session.token, {
+      page: 1,
+      pageSize: 100,
+      departmentId: waitlistFilters.departmentId || undefined
+    })
+    waitlistFilterDoctors.value = result.records
+  } catch (error) {
+    waitlistError.value = error instanceof ApiError ? error.message : '医生筛选数据加载失败'
+  } finally {
+    loadingWaitlistDoctors.value = false
+  }
+}
+
+async function loadAdminWaitlists(page = waitlistPage.value) {
+  if (!session.token) return
+  loadingWaitlists.value = true
+  waitlistError.value = ''
+  try {
+    const result = await adminWaitlistApi.page(session.token, {
+      page,
+      pageSize: waitlistPageSize.value,
+      status: waitlistFilters.status as WaitlistStatus || undefined,
+      scheduleDate: waitlistFilters.scheduleDate || undefined,
+      departmentId: waitlistFilters.departmentId || undefined,
+      doctorId: waitlistFilters.doctorId || undefined,
+      patientKeyword: waitlistFilters.patientKeyword.trim() || undefined
+    })
+    waitlistRecords.value = result.records
+    waitlistPage.value = result.page
+    waitlistTotal.value = result.total
+    waitlistTotalPages.value = result.totalPages
+  } catch (error) {
+    waitlistError.value = error instanceof ApiError ? error.message : '候补队列加载失败'
+  } finally {
+    loadingWaitlists.value = false
+  }
+}
+
+async function prepareWaitlistPage() {
+  await loadDepartments()
+  await loadWaitlistFilterDoctors()
+  await loadAdminWaitlists(1)
+}
+
+function searchWaitlists() {
+  void loadAdminWaitlists(1)
+}
+
+function resetWaitlistFilters() {
+  waitlistFilters.status = ''
+  waitlistFilters.scheduleDate = ''
+  waitlistFilters.departmentId = 0
+  waitlistFilters.doctorId = 0
+  waitlistFilters.patientKeyword = ''
+  void loadWaitlistFilterDoctors()
+  void loadAdminWaitlists(1)
+}
+
+function changeWaitlistDepartment() {
+  waitlistFilters.doctorId = 0
+  void loadWaitlistFilterDoctors()
+}
+
+function changeWaitlistPage(page: number) {
+  if (page < 1 || page > waitlistTotalPages.value || page === waitlistPage.value) return
+  void loadAdminWaitlists(page)
+}
+
+function changeWaitlistPageSize() {
+  void loadAdminWaitlists(1)
+}
+
+async function openWaitlistQueue(record: AdminWaitlistRecord) {
+  if (!session.token) return
+  selectedWaitlistQueue.value = null
+  waitlistQueueError.value = ''
+  loadingWaitlistQueue.value = true
+  try {
+    selectedWaitlistQueue.value = await adminWaitlistApi.slotQueue(session.token, record.scheduleSlotId)
+  } catch (error) {
+    waitlistQueueError.value = error instanceof ApiError ? error.message : '班次候补队列加载失败'
+  } finally {
+    loadingWaitlistQueue.value = false
+  }
+}
+
+function refreshWaitlistCountdown() {
+  waitlistNow.value = Date.now()
+  if (active.value !== 'waitlist') return
+  const expiredIds = waitlistRecords.value
+    .filter((record) => record.status === 'OFFERED' && record.offerExpireTime && new Date(record.offerExpireTime).getTime() <= waitlistNow.value)
+    .map((record) => record.id)
+    .filter((id) => !refreshedExpiredOfferIds.has(id))
+  if (expiredIds.length) {
+    expiredIds.forEach((id) => refreshedExpiredOfferIds.add(id))
+    void loadAdminWaitlists()
+  }
+}
+
 function logout() {
   const token = session.token
   signOut(); router.replace('/login')
@@ -462,9 +607,14 @@ watch(active, (value) => {
   if (value === 'resource') { void loadDepartments(); if (resourceTab.value === 'doctors') void loadDoctorPage() }
   if (value === 'schedule') void prepareSchedulePage()
   if (value === 'appointments') void loadAdminAppointments()
+  if (value === 'waitlist') void prepareWaitlistPage()
 })
 watch(resourceTab, (value) => { if (value === 'doctors') void loadDoctorPage() })
-onMounted(() => { if (active.value === 'resource') void loadDepartments() })
+onMounted(() => {
+  if (active.value === 'resource') void loadDepartments()
+  waitlistCountdownTimer = window.setInterval(refreshWaitlistCountdown, 1000)
+})
+onBeforeUnmount(() => { if (waitlistCountdownTimer !== undefined) window.clearInterval(waitlistCountdownTimer) })
 </script>
 
 <template>
@@ -491,6 +641,26 @@ onMounted(() => { if (active.value === 'resource') void loadDepartments() })
         <div v-if="loadingAppointments" class="resource-empty">正在加载预约订单…</div>
         <section v-else-if="adminAppointments.length" class="doctor-admin-table"><table><thead><tr><th>预约单号</th><th>患者</th><th>医生 / 科室</th><th>就诊时段</th><th>状态</th><th>操作</th></tr></thead><tbody><tr v-for="item in adminAppointments" :key="item.id"><td>{{ item.appointmentNo }}</td><td><b>{{ item.patientName }}</b></td><td>{{ item.doctorName }}<small class="appointment-department">{{ item.departmentName }}</small></td><td>{{ item.scheduleDate }} {{ item.startTime.slice(0, 5) }}-{{ item.endTime.slice(0, 5) }}<small class="appointment-department">{{ item.sessionName }}</small></td><td><span class="status" :class="item.status.toLowerCase()">{{ appointmentStatusText(item.status) }}</span></td><td><button v-if="canCompleteAppointment(item)" class="table-action" :disabled="completingAppointmentId !== null" @click="completeAppointment(item)">{{ completingAppointmentId === item.id ? '处理中…' : '确认完成' }}</button><span v-else class="appointment-action-hint">{{ item.status === 'BOOKED' ? '未到就诊时间' : '-' }}</span></td></tr></tbody></table></section>
         <div v-else class="resource-empty">暂无预约订单。</div>
+      </section>
+      <section v-else-if="active === 'waitlist'" class="resource-page">
+        <div class="resource-intro"><div><h2>候补队列</h2><p>只读查看候补状态、真实 FIFO 顺序与已保留的候补资格；不支持人工调整队列。</p></div><button class="table-action" :disabled="loadingWaitlists" @click="() => loadAdminWaitlists()">刷新</button></div>
+        <form class="waitlist-filter-bar" @submit.prevent="searchWaitlists">
+          <select v-model="waitlistFilters.status"><option value="">全部状态</option><option value="WAITING">排队中</option><option value="OFFERED">待确认</option><option value="CONFIRMED">候补成功</option><option value="EXPIRED">已过期</option><option value="CANCELLED">已取消</option></select>
+          <input v-model="waitlistFilters.scheduleDate" type="date" aria-label="排班日期">
+          <select v-model.number="waitlistFilters.departmentId" @change="changeWaitlistDepartment"><option :value="0">全部科室</option><option v-for="department in departments" :key="department.id" :value="department.id">{{ department.name }}</option></select>
+          <select v-model.number="waitlistFilters.doctorId" :disabled="loadingWaitlistDoctors"><option :value="0">{{ loadingWaitlistDoctors ? '加载医生中…' : '全部医生' }}</option><option v-for="doctor in waitlistFilterDoctors" :key="doctor.id" :value="doctor.id">{{ doctor.name }} · {{ doctor.departmentName }}</option></select>
+          <input v-model.trim="waitlistFilters.patientKeyword" type="search" placeholder="患者姓名 / 用户名 / 手机号">
+          <button class="table-action" type="submit">查询</button><button class="doctor-search-clear" type="button" @click="resetWaitlistFilters">重置筛选</button>
+        </form>
+        <p v-if="waitlistError" class="resource-error">{{ waitlistError }}</p>
+        <div v-if="loadingWaitlists" class="resource-empty">正在加载候补记录…</div>
+        <section v-else-if="waitlistRecords.length" class="doctor-admin-table waitlist-admin-table"><table><thead><tr><th>候补 ID</th><th>患者 / 用户</th><th>医生 / 科室</th><th>排班时间</th><th>状态</th><th>加入候补</th><th>OFFERED 截止</th><th>确认 / 取消时间</th><th>操作</th></tr></thead><tbody><tr v-for="record in waitlistRecords" :key="record.id"><td>#{{ record.id }}</td><td><b>{{ record.patientName }}</b><small class="appointment-department">{{ record.username }}{{ record.phone ? ` · ${record.phone}` : '' }}</small></td><td>{{ record.doctorName }}<small class="appointment-department">{{ record.departmentName }}</small></td><td>{{ record.scheduleDate }} {{ record.startTime.slice(0, 5) }}-{{ record.endTime.slice(0, 5) }}<small class="appointment-department">{{ record.sessionName }}</small></td><td><span class="status" :class="record.status.toLowerCase()">{{ waitlistStatusText[record.status] }}</span><small v-if="record.status === 'OFFERED'" class="waitlist-countdown">剩余确认时间 {{ waitlistCountdown(record.offerExpireTime) }}</small></td><td>{{ formatDateTime(record.createdAt) }}</td><td>{{ formatDateTime(record.offerExpireTime) }}</td><td>{{ formatDateTime(record.confirmedAt || record.cancelledAt) }}</td><td class="waitlist-actions"><button class="table-action" @click="openWaitlistQueue(record)">查看队列</button><button class="table-action" @click="selectedWaitlistRecord = record">详情</button></td></tr></tbody></table></section>
+        <div v-else class="resource-empty">没有符合筛选条件的候补记录。</div>
+        <div v-if="waitlistTotal > 0" class="doctor-pagination"><label>每页<select v-model.number="waitlistPageSize" @change="changeWaitlistPageSize"><option :value="10">10 条</option><option :value="20">20 条</option><option :value="50">50 条</option></select></label><span>共 {{ waitlistTotal }} 条候补记录</span><div><button :disabled="waitlistPage === 1" @click="changeWaitlistPage(waitlistPage - 1)">上一页</button><b>第 {{ waitlistPage }} / {{ waitlistTotalPages }} 页</b><button :disabled="waitlistPage === waitlistTotalPages" @click="changeWaitlistPage(waitlistPage + 1)">下一页</button></div></div>
+
+        <div v-if="selectedWaitlistQueue || loadingWaitlistQueue || waitlistQueueError" class="modal-mask" @click.self="selectedWaitlistQueue = null; waitlistQueueError = ''"><section class="department-modal waitlist-drawer"><div class="modal-head"><div><h2>班次候补队列</h2><p>排名由后端按 created_at、id 的真实 FIFO 规则返回。</p></div><button class="modal-close" @click="selectedWaitlistQueue = null; waitlistQueueError = ''">×</button></div><div v-if="loadingWaitlistQueue" class="resource-empty">正在加载班次候补队列…</div><p v-else-if="waitlistQueueError" class="resource-error">{{ waitlistQueueError }}</p><template v-else-if="selectedWaitlistQueue"><div class="detail-date"><b>{{ selectedWaitlistQueue.departmentName }} · {{ selectedWaitlistQueue.doctorName }}</b><span>{{ selectedWaitlistQueue.scheduleDate }} {{ selectedWaitlistQueue.startTime.slice(0, 5) }}-{{ selectedWaitlistQueue.endTime.slice(0, 5) }} · {{ selectedWaitlistQueue.sessionName }}</span></div><div class="detail-capacity"><article><small>当前总号源</small><strong>{{ selectedWaitlistQueue.totalCapacity }}</strong></article><article><small>当前剩余号源</small><strong>{{ selectedWaitlistQueue.remainingCapacity }}</strong></article><article><small>WAITING 人数</small><strong>{{ selectedWaitlistQueue.waitingCount }}</strong></article></div><section class="waitlist-offered"><h3>当前候补资格</h3><p v-if="!selectedWaitlistQueue.offeredCandidates.length" class="appointment-action-hint">当前没有待确认候补资格。</p><article v-for="candidate in selectedWaitlistQueue.offeredCandidates" :key="candidate.id"><b>{{ candidate.patientName }}</b><span>{{ candidate.username }}{{ candidate.phone ? ` · ${candidate.phone}` : '' }}</span><small>截止：{{ formatDateTime(candidate.offerExpireTime) }}（剩余 {{ waitlistCountdown(candidate.offerExpireTime) }}）</small></article></section><section class="waitlist-fifo"><h3>WAITING FIFO 队列</h3><table><thead><tr><th>排名</th><th>患者</th><th>加入时间</th><th>状态</th></tr></thead><tbody><tr v-for="candidate in selectedWaitlistQueue.waitingCandidates" :key="candidate.id"><td>#{{ candidate.queuePosition }}</td><td><b>{{ candidate.patientName }}</b><small class="appointment-department">{{ candidate.username }}{{ candidate.phone ? ` · ${candidate.phone}` : '' }}</small></td><td>{{ formatDateTime(candidate.createdAt) }}</td><td><span class="status waiting">排队中</span></td></tr></tbody></table><p v-if="!selectedWaitlistQueue.waitingCandidates.length" class="appointment-action-hint">当前没有 WAITING 候补用户。</p></section></template></section></div>
+
+        <div v-if="selectedWaitlistRecord" class="modal-mask" @click.self="selectedWaitlistRecord = null"><section class="department-modal waitlist-detail"><div class="modal-head"><div><h2>候补记录 #{{ selectedWaitlistRecord.id }}</h2><p>{{ selectedWaitlistRecord.patientName }} · {{ selectedWaitlistRecord.doctorName }} · {{ selectedWaitlistRecord.departmentName }}</p></div><button class="modal-close" @click="selectedWaitlistRecord = null">×</button></div><div class="waitlist-flow"><template v-for="(step, index) in waitlistFlow(selectedWaitlistRecord)" :key="step"><i v-if="index">→</i><span :class="{ current: step === selectedWaitlistRecord.status }">{{ waitlistStatusText[step] }}</span></template></div><dl class="waitlist-detail-grid"><div><dt>加入候补时间</dt><dd>{{ formatDateTime(selectedWaitlistRecord.createdAt) }}</dd></div><div><dt>OFFERED 过期时间</dt><dd>{{ formatDateTime(selectedWaitlistRecord.offerExpireTime) }}</dd></div><div><dt>确认时间</dt><dd>{{ formatDateTime(selectedWaitlistRecord.confirmedAt) }}</dd></div><div><dt>取消时间</dt><dd>{{ formatDateTime(selectedWaitlistRecord.cancelledAt) }}</dd></div></dl><p class="detail-note">当前候补表没有独立状态历史表；确认/取消时间仅在该记录当前处于对应终态时，由 updated_at 展示。</p></section></div>
       </section>
       <section v-else-if="active === 'schedule'" class="schedule-page">
         <div class="schedule-toolbar">

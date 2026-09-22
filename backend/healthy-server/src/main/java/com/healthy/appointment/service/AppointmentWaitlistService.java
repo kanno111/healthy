@@ -21,5 +21,6 @@ public interface AppointmentWaitlistService {
 
     void confirm(Long userId, Long waitlistId);
 
-    void expireDueOffers();
+    /** @return true only when this call changed OFFERED to EXPIRED. */
+    boolean expireOffered(Long waitlistId);
 }

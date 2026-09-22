@@ -1,0 +1,64 @@
+package com.healthy.appointment.service;
+
+import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.healthy.appointment.config.AppointmentWaitlistProperties;
+import com.healthy.appointment.entity.AppointmentWaitlist;
+import com.healthy.appointment.mapper.AppointmentWaitlistMapper;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.stereotype.Service;
+
+import java.time.LocalDateTime;
+import java.util.List;
+
+import static com.healthy.appointment.constant.Constant.WAITLIST_STATUS_OFFERED;
+
+/**
+ * Low-frequency recovery coordinator. The scan itself has no surrounding transaction so every
+ * candidate is handled through {@link AppointmentWaitlistService#expireOffered(Long)} in its own
+ * transaction. One broken record therefore cannot roll back the rest of the batch.
+ */
+@Service
+@Slf4j
+@RequiredArgsConstructor
+public class AppointmentWaitlistExpiryRecoveryService {
+    private static final int MAX_BATCH_SIZE = 1000;
+
+    private final AppointmentWaitlistMapper appointmentWaitlistMapper;
+    private final AppointmentWaitlistService appointmentWaitlistService;
+    private final AppointmentWaitlistProperties appointmentWaitlistProperties;
+
+    public RecoveryResult recoverDueOffers() {
+        int batchSize = Math.max(1,
+                Math.min(appointmentWaitlistProperties.getRecoveryBatchSize(), MAX_BATCH_SIZE));
+        List<AppointmentWaitlist> candidates = appointmentWaitlistMapper.selectList(
+                new LambdaQueryWrapper<AppointmentWaitlist>()
+                        .select(AppointmentWaitlist::getId)
+                        .eq(AppointmentWaitlist::getStatus, WAITLIST_STATUS_OFFERED)
+                        .le(AppointmentWaitlist::getOfferExpireTime, LocalDateTime.now())
+                        .orderByAsc(AppointmentWaitlist::getOfferExpireTime)
+                        .orderByAsc(AppointmentWaitlist::getId)
+                        .last("LIMIT " + batchSize));
+
+        int expired = 0;
+        int skipped = 0;
+        int failed = 0;
+        for (AppointmentWaitlist candidate : candidates) {
+            try {
+                if (appointmentWaitlistService.expireOffered(candidate.getId())) {
+                    expired++;
+                } else {
+                    skipped++;
+                }
+            } catch (RuntimeException exception) {
+                failed++;
+                log.error("Waitlist expiry recovery candidate failed: waitlistId={}, reason={}",
+                        candidate.getId(), exception.getMessage(), exception);
+            }
+        }
+        return new RecoveryResult(candidates.size(), expired, skipped, failed);
+    }
+
+    public record RecoveryResult(int scanned, int expired, int skipped, int failed) {
+    }
+}

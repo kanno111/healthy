@@ -3,6 +3,26 @@ spring:
     name: appointment-api
   profiles:
     default: local
+  rabbitmq:
+    host: ${RABBITMQ_HOST:localhost}
+    port: ${RABBITMQ_PORT:5672}
+    username: ${RABBITMQ_USERNAME:guest}
+    password: ${RABBITMQ_PASSWORD:guest}
+    publisher-confirm-type: correlated
+    publisher-returns: true
+    template:
+      mandatory: true
+    listener:
+      simple:
+        acknowledge-mode: manual
+        default-requeue-rejected: false
+        prefetch: 1
+        retry:
+          enabled: true
+          max-attempts: 3
+          initial-interval: 500ms
+          multiplier: 2
+          max-interval: 2s
 server:
   port: ${SERVER_PORT:8080}
   servlet:
@@ -28,4 +48,5 @@ appointment:
     repair-check-ttl: 8s
   waitlist:
     offer-duration: 10s
-    offer-expire-check-delay: 2s
+    offer-expire-check-delay: 2m
+    recovery-batch-size: 100

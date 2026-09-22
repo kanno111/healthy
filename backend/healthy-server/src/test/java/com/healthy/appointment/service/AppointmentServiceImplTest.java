@@ -11,6 +11,7 @@ import com.healthy.appointment.mapper.PatientMapper;
 import com.healthy.appointment.service.impl.AppointmentServiceImpl;
 import com.healthy.appointment.vo.PatientAppointmentVO;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.springframework.transaction.support.TransactionSynchronization;
 import org.springframework.transaction.support.TransactionSynchronizationManager;
@@ -35,6 +36,11 @@ import static com.healthy.appointment.service.AppointmentStockService.PreDeductR
 
 @ExtendWith(MockitoExtension.class)
 class AppointmentServiceImplTest {
+    @BeforeAll
+    static void initializeMybatisPlusMetadata() {
+        MybatisPlusTestHelper.initializeTableInfo(Patient.class);
+    }
+
     @Mock
     private PatientMapper patientMapper;
     @Mock

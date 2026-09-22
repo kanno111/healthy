@@ -14,6 +14,7 @@ import com.healthy.appointment.mapper.AppointmentMapper;
 import com.healthy.appointment.mapper.AppointmentWaitlistMapper;
 import com.healthy.appointment.mapper.DoctorScheduleSlotMapper;
 import com.healthy.appointment.mapper.PatientMapper;
+import com.healthy.appointment.mq.WaitlistTimeoutMessagePublisher;
 import com.healthy.appointment.service.AppointmentWaitlistService;
 import com.healthy.appointment.service.AppointmentStockService;
 import com.healthy.appointment.vo.PatientAppointmentWaitlistVO;
@@ -45,6 +46,7 @@ public class AppointmentWaitlistServiceImpl implements AppointmentWaitlistServic
     private final AppointmentWaitlistMapper appointmentWaitlistMapper;
     private final AppointmentStockService appointmentStockService;
     private final AppointmentWaitlistProperties appointmentWaitlistProperties;
+    private final WaitlistTimeoutMessagePublisher waitlistTimeoutMessagePublisher;
 
     @Override
     public PatientAppointmentWaitlistVO join(
@@ -116,6 +118,11 @@ public class AppointmentWaitlistServiceImpl implements AppointmentWaitlistServic
     @Override
     @Transactional(rollbackFor = Exception.class)
     public boolean offerFirstWaiting(Long scheduleSlotId) {
+        // Serialize allocation for one slot before locking a FIFO waitlist row. This avoids
+        // InnoDB next-key-lock deadlocks when two cancellations release the same slot together.
+        if (doctorScheduleSlotMapper.findByIdForUpdate(scheduleSlotId) == null) {
+            throw new BusinessException(ErrorCode.NOT_FOUND);
+        }
         AppointmentWaitlist waiting = appointmentWaitlistMapper.selectFirstWaitingForUpdate(scheduleSlotId);
         if (waiting == null) {
             return false;
@@ -132,6 +139,7 @@ public class AppointmentWaitlistServiceImpl implements AppointmentWaitlistServic
             // a caller to return the reserved capacity to public stock while a waiter still exists.
             throw new BusinessException(ErrorCode.CONFLICT);
         }
+        waitlistTimeoutMessagePublisher.publishAfterCommit(waiting.getId(), scheduleSlotId);
         return true;
     }
 
@@ -191,29 +199,24 @@ public class AppointmentWaitlistServiceImpl implements AppointmentWaitlistServic
 
     @Override
     @Transactional(rollbackFor = Exception.class)
-    public void expireDueOffers() {
-        LocalDateTime now = LocalDateTime.now();
-        List<AppointmentWaitlist> expiredCandidates = appointmentWaitlistMapper.selectList(
-                new LambdaQueryWrapper<AppointmentWaitlist>()
-                        .eq(AppointmentWaitlist::getStatus, WAITLIST_STATUS_OFFERED)
-                        .le(AppointmentWaitlist::getOfferExpireTime, now)
-                        .orderByAsc(AppointmentWaitlist::getOfferExpireTime)
-                        .orderByAsc(AppointmentWaitlist::getId)
-                        .last("LIMIT 100"));
-        for (AppointmentWaitlist candidate : expiredCandidates) {
-            int expired = appointmentWaitlistMapper.update(null, new LambdaUpdateWrapper<AppointmentWaitlist>()
-                    .eq(AppointmentWaitlist::getId, candidate.getId())
-                    .eq(AppointmentWaitlist::getStatus, WAITLIST_STATUS_OFFERED)
-                    .le(AppointmentWaitlist::getOfferExpireTime, now)
-                    .set(AppointmentWaitlist::getStatus, WAITLIST_STATUS_EXPIRED));
-            if (expired != 1) {
-                // A concurrent confirmation or another scheduler instance already owns this offer.
-                continue;
-            }
-            if (!offerFirstWaiting(candidate.getScheduleSlotId())) {
-                releaseToPublicStock(candidate.getScheduleSlotId());
-            }
+    public boolean expireOffered(Long waitlistId) {
+        AppointmentWaitlist candidate = appointmentWaitlistMapper.selectById(waitlistId);
+        if (candidate == null) {
+            return false;
         }
+        LocalDateTime now = LocalDateTime.now();
+        int expired = appointmentWaitlistMapper.update(null, new LambdaUpdateWrapper<AppointmentWaitlist>()
+                .eq(AppointmentWaitlist::getId, waitlistId)
+                .eq(AppointmentWaitlist::getStatus, WAITLIST_STATUS_OFFERED)
+                .le(AppointmentWaitlist::getOfferExpireTime, now)
+                .set(AppointmentWaitlist::getStatus, WAITLIST_STATUS_EXPIRED));
+        if (expired != 1) {
+            return false;
+        }
+        if (!offerFirstWaiting(candidate.getScheduleSlotId())) {
+            releaseToPublicStock(candidate.getScheduleSlotId());
+        }
+        return true;
     }
 
     private AppointmentWaitlist findActiveWaitlist(Long patientId, Long slotId) {

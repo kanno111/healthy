@@ -4,10 +4,11 @@ import org.springframework.boot.context.properties.ConfigurationProperties;
 
 import java.time.Duration;
 
-/** Timing settings for the database-backed waitlist flow. */
+/** Timing settings for the waitlist offer flow. */
 @ConfigurationProperties(prefix = "appointment.waitlist")
 public class AppointmentWaitlistProperties {
     private Duration offerDuration = Duration.ofSeconds(10);
+    private int recoveryBatchSize = 100;
 
     public Duration getOfferDuration() {
         return offerDuration;
@@ -15,5 +16,13 @@ public class AppointmentWaitlistProperties {
 
     public void setOfferDuration(Duration offerDuration) {
         this.offerDuration = offerDuration;
+    }
+
+    public int getRecoveryBatchSize() {
+        return recoveryBatchSize;
+    }
+
+    public void setRecoveryBatchSize(int recoveryBatchSize) {
+        this.recoveryBatchSize = recoveryBatchSize;
     }
 }

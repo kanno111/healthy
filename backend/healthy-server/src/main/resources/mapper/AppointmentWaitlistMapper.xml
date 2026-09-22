@@ -39,4 +39,82 @@
         WHERE waitlist.id = #{id}
           AND waitlist.patient_id = #{patientId}
     </select>
+
+    <sql id="adminWaitlistColumns">
+        waitlist.id, waitlist.patient_id, waitlist.schedule_slot_id,
+        COALESCE(patient.real_name, account.name, account.username) AS patient_name,
+        account.username, account.phone,
+        department.id AS department_id, department.name AS department_name,
+        doctor.id AS doctor_id, doctor.name AS doctor_name,
+        slot.schedule_date, slot.session_name, slot.start_time, slot.end_time,
+        waitlist.status, waitlist.created_at, waitlist.offer_expire_time,
+        CASE WHEN waitlist.status = 'CONFIRMED' THEN waitlist.updated_at END AS confirmed_at,
+        CASE WHEN waitlist.status = 'CANCELLED' THEN waitlist.updated_at END AS cancelled_at
+    </sql>
+
+    <sql id="adminWaitlistJoins">
+        FROM appointment_waitlist waitlist
+        INNER JOIN patient ON patient.id = waitlist.patient_id
+        INNER JOIN sys_user account ON account.id = patient.user_id
+        INNER JOIN doctor_schedule_slot slot ON slot.id = waitlist.schedule_slot_id
+        INNER JOIN doctor ON doctor.id = slot.doctor_id
+        INNER JOIN department ON department.id = doctor.department_id
+    </sql>
+
+    <select id="pageForAdmin" resultType="com.healthy.appointment.vo.AdminAppointmentWaitlistVO">
+        SELECT <include refid="adminWaitlistColumns"/>
+        <include refid="adminWaitlistJoins"/>
+        <where>
+            <if test="status != null">AND waitlist.status = #{status}</if>
+            <if test="scheduleDate != null">AND slot.schedule_date = #{scheduleDate}</if>
+            <if test="departmentId != null">AND department.id = #{departmentId}</if>
+            <if test="doctorId != null">AND doctor.id = #{doctorId}</if>
+            <if test="patientKeyword != null">
+                AND (patient.real_name LIKE CONCAT('%', #{patientKeyword}, '%')
+                     OR account.name LIKE CONCAT('%', #{patientKeyword}, '%')
+                     OR account.username LIKE CONCAT('%', #{patientKeyword}, '%')
+                     OR account.phone LIKE CONCAT('%', #{patientKeyword}, '%'))
+            </if>
+        </where>
+        ORDER BY waitlist.created_at DESC, waitlist.id DESC
+    </select>
+
+    <select id="findQueueSummary" resultType="com.healthy.appointment.vo.AdminAppointmentWaitlistQueueVO">
+        SELECT slot.id AS schedule_slot_id, department.name AS department_name, doctor.name AS doctor_name,
+               slot.schedule_date, slot.session_name, slot.start_time, slot.end_time,
+               slot.total_capacity, slot.remaining_capacity,
+               SUM(CASE WHEN waitlist.status = 'WAITING' THEN 1 ELSE 0 END) AS waiting_count
+        FROM doctor_schedule_slot slot
+        INNER JOIN doctor ON doctor.id = slot.doctor_id
+        INNER JOIN department ON department.id = doctor.department_id
+        LEFT JOIN appointment_waitlist waitlist ON waitlist.schedule_slot_id = slot.id
+        WHERE slot.id = #{scheduleSlotId}
+        GROUP BY slot.id, department.name, doctor.name, slot.schedule_date, slot.session_name,
+                 slot.start_time, slot.end_time, slot.total_capacity, slot.remaining_capacity
+    </select>
+
+    <select id="listOfferedCandidates" resultType="com.healthy.appointment.vo.AdminAppointmentWaitlistQueueItemVO">
+        SELECT waitlist.id, waitlist.patient_id,
+               COALESCE(patient.real_name, account.name, account.username) AS patient_name,
+               account.username, account.phone, waitlist.status, waitlist.created_at, waitlist.offer_expire_time
+        FROM appointment_waitlist waitlist
+        INNER JOIN patient ON patient.id = waitlist.patient_id
+        INNER JOIN sys_user account ON account.id = patient.user_id
+        WHERE waitlist.schedule_slot_id = #{scheduleSlotId}
+          AND waitlist.status = 'OFFERED'
+        ORDER BY waitlist.offer_expire_time ASC, waitlist.id ASC
+    </select>
+
+    <select id="listWaitingCandidates" resultType="com.healthy.appointment.vo.AdminAppointmentWaitlistQueueItemVO">
+        SELECT waitlist.id, waitlist.patient_id,
+               COALESCE(patient.real_name, account.name, account.username) AS patient_name,
+               account.username, account.phone, waitlist.status, waitlist.created_at,
+               ROW_NUMBER() OVER (ORDER BY waitlist.created_at ASC, waitlist.id ASC) AS queue_position
+        FROM appointment_waitlist waitlist
+        INNER JOIN patient ON patient.id = waitlist.patient_id
+        INNER JOIN sys_user account ON account.id = patient.user_id
+        WHERE waitlist.schedule_slot_id = #{scheduleSlotId}
+          AND waitlist.status = 'WAITING'
+        ORDER BY waitlist.created_at ASC, waitlist.id ASC
+    </select>
 </mapper>
