@@ -17,15 +17,22 @@ import java.util.UUID;
 @Slf4j
 @RequiredArgsConstructor
 public class WaitlistTimeoutMessagePublisher {
+    public static final String WAITLIST_ID_HEADER = "x-waitlist-id";
+    public static final String SLOT_ID_HEADER = "x-slot-id";
+
     private final RabbitTemplate rabbitTemplate;
     private final AppointmentWaitlistProperties appointmentWaitlistProperties;
 
     @PostConstruct
     void configureReturnedMessageLogging() {
-        rabbitTemplate.setReturnsCallback(returned -> log.error(
-                "Waitlist timeout message was returned: exchange={}, routingKey={}, replyCode={}, replyText={}",
-                returned.getExchange(), returned.getRoutingKey(),
-                returned.getReplyCode(), returned.getReplyText()));
+        rabbitTemplate.setReturnsCallback(returned -> {
+            String messageId = returned.getMessage().getMessageProperties().getMessageId();
+            Object waitlistId = returned.getMessage().getMessageProperties().getHeaders().get(WAITLIST_ID_HEADER);
+            Object slotId = returned.getMessage().getMessageProperties().getHeaders().get(SLOT_ID_HEADER);
+            log.error("RabbitMQ message could not be routed: messageId={}, correlationData={}, waitlistId={}, slotId={}, exchange={}, routingKey={}, replyCode={}, replyText={}, sendResult=RETURNED",
+                    messageId, messageId, waitlistId, slotId, returned.getExchange(), returned.getRoutingKey(),
+                    returned.getReplyCode(), returned.getReplyText());
+        });
     }
 
     public void publishAfterCommit(Long waitlistId, Long scheduleSlotId) {
@@ -49,6 +56,7 @@ public class WaitlistTimeoutMessagePublisher {
     private void publish(Long waitlistId, Long scheduleSlotId) {
         CorrelationData correlationData = new CorrelationData(
                 "waitlist-timeout-" + waitlistId + "-" + UUID.randomUUID());
+        String messageId = correlationData.getId();
         try {
             rabbitTemplate.convertAndSend(WaitlistRabbitMqConfig.DELAY_EXCHANGE,
                     WaitlistRabbitMqConfig.DELAY_ROUTING_KEY,
@@ -56,26 +64,37 @@ public class WaitlistTimeoutMessagePublisher {
                     message -> {
                         message.getMessageProperties().setExpiration(String.valueOf(
                                 appointmentWaitlistProperties.getOfferDuration().toMillis()));
+                        message.getMessageProperties().setMessageId(messageId);
+                        message.getMessageProperties().setHeader(WAITLIST_ID_HEADER, waitlistId);
+                        message.getMessageProperties().setHeader(SLOT_ID_HEADER, scheduleSlotId);
                         return message;
                     }, correlationData);
             correlationData.getFuture().whenComplete((confirm, exception) -> {
                 if (exception != null) {
-                    log.error("Waitlist timeout publisher confirm failed: waitlistId={}, scheduleSlotId={}, correlationId={}",
-                            waitlistId, scheduleSlotId, correlationData.getId(), exception);
+                    log.error("RabbitMQ publisher confirm failed: messageId={}, correlationData={}, waitlistId={}, slotId={}, exchange={}, routingKey={}, sendResult=CONFIRM_ERROR",
+                            messageId, correlationData.getId(), waitlistId, scheduleSlotId,
+                            WaitlistRabbitMqConfig.DELAY_EXCHANGE, WaitlistRabbitMqConfig.DELAY_ROUTING_KEY, exception);
                     return;
                 }
                 if (!confirm.isAck()) {
-                    log.error("Waitlist timeout message was nacked: waitlistId={}, scheduleSlotId={}, correlationId={}, reason={}",
-                            waitlistId, scheduleSlotId, correlationData.getId(), confirm.getReason());
+                    log.error("RabbitMQ publisher confirm NACK: messageId={}, correlationData={}, waitlistId={}, slotId={}, exchange={}, routingKey={}, reason={}, sendResult=NACK",
+                            messageId, correlationData.getId(), waitlistId, scheduleSlotId,
+                            WaitlistRabbitMqConfig.DELAY_EXCHANGE, WaitlistRabbitMqConfig.DELAY_ROUTING_KEY,
+                            confirm.getReason());
                     return;
                 }
-                log.debug("Waitlist timeout message confirmed: waitlistId={}, scheduleSlotId={}, correlationId={}",
-                        waitlistId, scheduleSlotId, correlationData.getId());
+                if (correlationData.getReturned() != null) {
+                    return;
+                }
+                log.info("RabbitMQ message sent successfully: messageId={}, correlationData={}, waitlistId={}, slotId={}, exchange={}, routingKey={}, sendResult=ACK",
+                        messageId, correlationData.getId(), waitlistId, scheduleSlotId,
+                        WaitlistRabbitMqConfig.DELAY_EXCHANGE, WaitlistRabbitMqConfig.DELAY_ROUTING_KEY);
             });
         } catch (RuntimeException exception) {
             // The committed OFFERED record is recovered later by the low-frequency database scan.
-            log.error("Unable to publish waitlist timeout message: waitlistId={}, scheduleSlotId={}, reason={}",
-                    waitlistId, scheduleSlotId, exception.getMessage(), exception);
+            log.error("Unable to publish RabbitMQ message: messageId={}, correlationData={}, waitlistId={}, slotId={}, exchange={}, routingKey={}, sendResult=FAILED",
+                    messageId, correlationData.getId(), waitlistId, scheduleSlotId,
+                    WaitlistRabbitMqConfig.DELAY_EXCHANGE, WaitlistRabbitMqConfig.DELAY_ROUTING_KEY, exception);
         }
     }
 }

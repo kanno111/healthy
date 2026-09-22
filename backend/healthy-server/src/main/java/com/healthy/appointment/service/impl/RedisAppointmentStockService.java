@@ -4,11 +4,10 @@ import com.healthy.appointment.enumeration.ErrorCode;
 import com.healthy.appointment.exception.BusinessException;
 import com.healthy.appointment.service.AppointmentStockService;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.data.redis.core.script.DefaultRedisScript;
 import org.springframework.stereotype.Service;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 import java.time.Duration;
 import java.util.List;
@@ -17,9 +16,9 @@ import static com.healthy.appointment.constant.Constant.APPOINTMENT_STOCK_PREFIX
 
 /** Redis 班次库存实现；Redis 异常或库存键缺失时失败关闭，绝不绕过 MySQL 最终扣减。 */
 @Service
+@Slf4j
 @RequiredArgsConstructor
 public class RedisAppointmentStockService implements AppointmentStockService {
-    private static final Logger log = LoggerFactory.getLogger(RedisAppointmentStockService.class);
     private static final DefaultRedisScript<Long> PRE_DEDUCT_SCRIPT = new DefaultRedisScript<>("""
             if redis.call('EXISTS', KEYS[1]) == 0 then
                 return -1

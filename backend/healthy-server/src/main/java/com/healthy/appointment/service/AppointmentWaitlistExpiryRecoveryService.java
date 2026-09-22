@@ -12,6 +12,7 @@ import java.time.LocalDateTime;
 import java.util.List;
 
 import static com.healthy.appointment.constant.Constant.WAITLIST_STATUS_OFFERED;
+import static com.healthy.appointment.constant.Constant.WAITLIST_STATUS_EXPIRED;
 
 /**
  * Low-frequency recovery coordinator. The scan itself has no surrounding transaction so every
@@ -33,7 +34,6 @@ public class AppointmentWaitlistExpiryRecoveryService {
                 Math.min(appointmentWaitlistProperties.getRecoveryBatchSize(), MAX_BATCH_SIZE));
         List<AppointmentWaitlist> candidates = appointmentWaitlistMapper.selectList(
                 new LambdaQueryWrapper<AppointmentWaitlist>()
-                        .select(AppointmentWaitlist::getId)
                         .eq(AppointmentWaitlist::getStatus, WAITLIST_STATUS_OFFERED)
                         .le(AppointmentWaitlist::getOfferExpireTime, LocalDateTime.now())
                         .orderByAsc(AppointmentWaitlist::getOfferExpireTime)
@@ -44,11 +44,19 @@ public class AppointmentWaitlistExpiryRecoveryService {
         int skipped = 0;
         int failed = 0;
         for (AppointmentWaitlist candidate : candidates) {
+            log.warn("Scheduled scan found stale OFFERED waitlist: waitlistId={}, patientId={}, slotId={}, oldStatus={}, offerExpireTime={}",
+                    candidate.getId(), candidate.getPatientId(), candidate.getScheduleSlotId(),
+                    candidate.getStatus(), candidate.getOfferExpireTime());
             try {
                 if (appointmentWaitlistService.expireOffered(candidate.getId())) {
                     expired++;
+                    log.info("Scheduled compensation processed successfully: waitlistId={}, patientId={}, slotId={}, oldStatus={}, newStatus={}, offerExpireTime={}",
+                            candidate.getId(), candidate.getPatientId(), candidate.getScheduleSlotId(),
+                            WAITLIST_STATUS_OFFERED, WAITLIST_STATUS_EXPIRED, candidate.getOfferExpireTime());
                 } else {
                     skipped++;
+                    log.warn("Scheduled compensation skipped because business state already changed: waitlistId={}, patientId={}, slotId={}, affectedRows=0",
+                            candidate.getId(), candidate.getPatientId(), candidate.getScheduleSlotId());
                 }
             } catch (RuntimeException exception) {
                 failed++;

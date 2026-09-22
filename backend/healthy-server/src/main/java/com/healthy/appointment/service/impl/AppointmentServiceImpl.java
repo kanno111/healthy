@@ -17,6 +17,7 @@ import com.healthy.appointment.service.AppointmentWaitlistService;
 import com.healthy.appointment.vo.AdminAppointmentVO;
 import com.healthy.appointment.vo.PatientAppointmentVO;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.dao.DuplicateKeyException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -35,6 +36,7 @@ import static com.healthy.appointment.service.AppointmentStockService.PreDeductR
 import static com.healthy.appointment.service.AppointmentStockService.PreDeductResult.SUCCESS;
 
 @Service
+@Slf4j
 @RequiredArgsConstructor
 public class AppointmentServiceImpl implements AppointmentService {
     private final PatientMapper patientMapper;
@@ -94,7 +96,11 @@ public class AppointmentServiceImpl implements AppointmentService {
             throw new BusinessException(ErrorCode.CONFLICT);
         }
 
-        return appointmentMapper.findByIdAndPatientId(appointment.getId(), patientId);
+        PatientAppointmentVO result = appointmentMapper.findByIdAndPatientId(appointment.getId(), patientId);
+        logAfterCommit(() -> log.info(
+                "Appointment booked successfully: appointmentId={}, patientId={}, slotId={}",
+                appointment.getId(), patientId, slotId));
+        return result;
     }
 
     /** 查询当前登录患者的预约记录，最新创建的记录排在最前。 */
@@ -118,6 +124,9 @@ public class AppointmentServiceImpl implements AppointmentService {
         }
         // A freed slot is reserved for the FIFO waitlist before it can ever enter public stock.
         if (appointmentWaitlistService.offerFirstWaiting(appointment.getScheduleSlotId())) {
+            logAfterCommit(() -> log.info(
+                    "Appointment cancelled successfully: appointmentId={}, patientId={}, slotId={}, stockDestination=WAITLIST",
+                    appointmentId, patientId, appointment.getScheduleSlotId()));
             return;
         }
         if (doctorScheduleSlotMapper.increaseRemainingCapacity(appointment.getScheduleSlotId()) != 1) {
@@ -125,6 +134,9 @@ public class AppointmentServiceImpl implements AppointmentService {
         }
         appointmentStockService.restore(appointment.getScheduleSlotId());
         preDeductRedisStockIfTransactionDoesNotCommit(appointment.getScheduleSlotId());
+        logAfterCommit(() -> log.info(
+                "Appointment cancelled successfully: appointmentId={}, patientId={}, slotId={}, stockDestination=PUBLIC",
+                appointmentId, patientId, appointment.getScheduleSlotId()));
     }
 
     @Override
@@ -196,7 +208,22 @@ public class AppointmentServiceImpl implements AppointmentService {
 
     private void reloadStockIfMissing(Long slotId) {
         DoctorScheduleSlot slot = getAvailableSlot(slotId);
+        log.warn("Redis stock key missing; lazy load triggered: slotId={}, redisStock={}, mysqlStock={}",
+                slotId, null, slot.getRemainingCapacity());
         appointmentStockService.initializeIfAbsent(slotId, slot.getRemainingCapacity());
+    }
+
+    private void logAfterCommit(Runnable loggingAction) {
+        if (!TransactionSynchronizationManager.isSynchronizationActive()) {
+            loggingAction.run();
+            return;
+        }
+        TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+            @Override
+            public void afterCommit() {
+                loggingAction.run();
+            }
+        });
     }
 
     private void restoreRedisStockIfTransactionDoesNotCommit(Long slotId) {

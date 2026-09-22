@@ -1,5 +1,6 @@
 package com.healthy.appointment.config;
 
+import com.healthy.appointment.mq.WaitlistTimeoutMessagePublisher;
 import org.springframework.amqp.AmqpRejectAndDontRequeueException;
 import org.springframework.amqp.core.Binding;
 import org.springframework.amqp.core.BindingBuilder;
@@ -18,10 +19,12 @@ import org.springframework.boot.autoconfigure.amqp.RabbitProperties;
 import org.springframework.boot.autoconfigure.amqp.SimpleRabbitListenerContainerFactoryConfigurer;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import lombok.extern.slf4j.Slf4j;
 
 import java.util.Map;
 
 @Configuration
+@Slf4j
 public class WaitlistRabbitMqConfig {
     public static final String DELAY_EXCHANGE = "appointment.waitlist.timeout.exchange";
     public static final String DEAD_LETTER_EXCHANGE = "appointment.waitlist.timeout.dlx";
@@ -100,7 +103,20 @@ public class WaitlistRabbitMqConfig {
                 rabbitTemplate, FAILURE_EXCHANGE, FAILURE_ROUTING_KEY,
                 CachingConnectionFactory.ConfirmType.CORRELATED);
         MessageRecoverer parkingRecoverer = (message, cause) -> {
-            republisher.recover(message, cause);
+            String messageId = message.getMessageProperties().getMessageId();
+            Object waitlistId = message.getMessageProperties().getHeaders()
+                    .get(WaitlistTimeoutMessagePublisher.WAITLIST_ID_HEADER);
+            Object slotId = message.getMessageProperties().getHeaders()
+                    .get(WaitlistTimeoutMessagePublisher.SLOT_ID_HEADER);
+            try {
+                republisher.recover(message, cause);
+                log.error("RabbitMQ consumer retries exhausted; message moved to failure queue: messageId={}, waitlistId={}, slotId={}, exchange={}, routingKey={}, retryResult=PARKED",
+                        messageId, waitlistId, slotId, FAILURE_EXCHANGE, FAILURE_ROUTING_KEY, cause);
+            } catch (RuntimeException exception) {
+                log.error("RabbitMQ consumer retries exhausted and failure-queue publish failed: messageId={}, waitlistId={}, slotId={}, exchange={}, routingKey={}, retryResult=PARK_FAILED",
+                        messageId, waitlistId, slotId, FAILURE_EXCHANGE, FAILURE_ROUTING_KEY, exception);
+                throw exception;
+            }
             // Manual acknowledgement mode requires the original failed delivery to be settled.
             // It has already been safely parked, so reject it without putting it back in a loop.
             throw new AmqpRejectAndDontRequeueException(

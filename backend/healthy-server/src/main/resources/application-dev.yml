@@ -11,3 +11,11 @@ spring:
       database: ${REDIS_DATABASE:3}
       password: ${REDIS_PASSWORD:}
       timeout: 2s
+
+logging:
+  level:
+    com.healthy.appointment: debug
+    com.healthy.appointment.mapper: info
+    org.mybatis: info
+    com.baomidou.mybatisplus: info
+    org.springframework: info

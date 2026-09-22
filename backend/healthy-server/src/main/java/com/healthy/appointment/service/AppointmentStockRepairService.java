@@ -45,6 +45,8 @@ public class AppointmentStockRepairService {
             if (!appointmentStockService.tryAcquireRepairCheck(slotId, properties.getRepairCheckTtl())) {
                 return;
             }
+            log.warn("Redis stock repair triggered: slotId={}, repairDelay={}, repairResult=SCHEDULED",
+                    slotId, properties.getRepairDelay());
             taskScheduler.schedule(() -> repair(slotId), Instant.now().plus(properties.getRepairDelay()));
         } catch (RuntimeException exception) {
             // 自愈只是降级保护，调度或 Redis 标记异常不能改变本次“无号”的业务结果。
@@ -61,15 +63,22 @@ public class AppointmentStockRepairService {
                 return;
             }
             DoctorScheduleSlot slot = doctorScheduleSlotMapper.findById(slotId);
+            Integer mysqlStock = slot == null ? null : slot.getRemainingCapacity();
             if (slot != null && SCHEDULE_STATUS_OPEN.equals(slot.getStatus())
-                    && slot.getRemainingCapacity() != null
-                    && redisStock.equals(slot.getRemainingCapacity())) {
+                    && mysqlStock != null
+                    && redisStock.equals(mysqlStock)) {
                 return;
             }
+            Integer delta = mysqlStock == null ? null : mysqlStock - redisStock;
+            log.warn("Redis/MySQL stock mismatch detected: slotId={}, redisStock={}, mysqlStock={}, delta={}, repairResult=DELETE_PENDING",
+                    slotId, redisStock, mysqlStock, delta);
             // Lua 内再次确认 Redis 值仍为本次观测值，避免并发挂号/退号后误删新库存。
             if (appointmentStockService.removeIfValue(slotId, redisStock)) {
-                log.warn("Removed drifted Redis stock cache: operation=REMOVE_IF_VALUE, slotId={}, redisStock={}, mysqlRemainingCapacity={}",
-                        slotId, redisStock, slot == null ? null : slot.getRemainingCapacity());
+                log.warn("Abnormal Redis stock key deleted; waiting for lazy rebuild: slotId={}, redisStock={}, mysqlStock={}, delta={}, repairResult=DELETED",
+                        slotId, redisStock, mysqlStock, delta);
+            } else {
+                log.warn("Redis stock repair skipped because value changed concurrently: slotId={}, redisStock={}, mysqlStock={}, delta={}, repairResult=SKIPPED",
+                        slotId, redisStock, mysqlStock, delta);
             }
         } catch (RuntimeException exception) {
             log.error("Redis stock repair failed: operation=REPAIR, slotId={}, reason={}",

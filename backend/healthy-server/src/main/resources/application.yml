@@ -35,8 +35,21 @@ server:
 
 # 只输出 Mapper 执行的 SQL，便于本地开发排查；不会记录数据库密码。
 logging:
+  file:
+    name: logs/hospital-appointment.log
+  logback:
+    rollingpolicy:
+      file-name-pattern: ${LOG_FILE}.%d{yyyy-MM-dd}.%i.gz
+      max-file-size: 50MB
+      max-history: 14
+      total-size-cap: 1GB
   level:
-    com.healthy.appointment.mapper: debug
+    root: info
+    com.healthy.appointment: info
+    com.healthy.appointment.mapper: info
+    org.mybatis: info
+    com.baomidou.mybatisplus: info
+    org.springframework: info
 
 jwt:
   secret: ${JWT_SECRET:healthy-appointment-local-development-secret-key-2026}
