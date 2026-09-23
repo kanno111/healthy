@@ -1,6 +1,6 @@
 import { reactive } from 'vue'
 
-export type UserRole = 'PATIENT' | 'STAFF'
+export type UserRole = 'PATIENT' | 'STAFF' | 'DOCTOR'
 type Session = { loggedIn: boolean; token: string; userId: number | null; role: UserRole | null; name: string }
 
 const saved = localStorage.getItem('smart-appointment-session')

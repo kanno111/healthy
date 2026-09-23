@@ -6,12 +6,14 @@ import AppointmentsView from './views/AppointmentsView.vue'
 import WaitlistsView from './views/WaitlistsView.vue'
 import AdminView from './views/AdminView.vue'
 import LoginView from './views/LoginView.vue'
+import DoctorAppointmentsView from './views/DoctorAppointmentsView.vue'
 import { session } from './stores/session'
 
 const router = createRouter({
   history: createWebHistory(),
   routes: [
     { path: '/login', component: LoginView, meta: { public: true } },
+    { path: '/doctor/appointments', component: DoctorAppointmentsView, meta: { role: 'DOCTOR' } },
     { path: '/', component: HomeView, meta: { role: 'PATIENT' } },
     { path: '/doctor/:id', component: DoctorView, meta: { role: 'PATIENT' } },
     { path: '/appointment/confirm', component: AppointmentConfirmView, meta: { role: 'PATIENT' } },
@@ -22,9 +24,10 @@ const router = createRouter({
 })
 
 router.beforeEach((to) => {
-  if (to.meta.public) return session.loggedIn ? (session.role === 'STAFF' ? '/admin' : '/') : true
+  const roleHome = session.role === 'STAFF' ? '/admin' : session.role === 'DOCTOR' ? '/doctor/appointments' : '/'
+  if (to.meta.public) return session.loggedIn ? roleHome : true
   if (!session.loggedIn) return '/login'
-  return to.meta.role === session.role ? true : (session.role === 'STAFF' ? '/admin' : '/')
+  return to.meta.role === session.role ? true : roleHome
 })
 
 export default router

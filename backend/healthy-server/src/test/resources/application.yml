@@ -1,6 +1,15 @@
 spring:
   profiles:
     default: local
+  flyway:
+    enabled: true
+    locations: classpath:db/migration
+    baseline-on-migrate: false
+    baseline-version: "8"
+    baseline-description: Existing schema before Flyway adoption
+    validate-on-migrate: true
+    validate-migration-naming: true
+    clean-disabled: true
   rabbitmq:
     listener:
       simple:

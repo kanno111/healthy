@@ -1,11 +1,14 @@
 package com.healthy.appointment.mapper;
 
+import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.healthy.appointment.entity.Appointment;
 import com.healthy.appointment.vo.AdminAppointmentVO;
 import com.healthy.appointment.vo.PatientAppointmentVO;
+import com.healthy.appointment.vo.DoctorAppointmentVO;
 import org.apache.ibatis.annotations.Param;
 
 import java.util.List;
+import java.time.LocalDate;
 
 public interface AppointmentMapper {
     int insert(@Param("appointment") Appointment appointment);
@@ -27,6 +30,15 @@ public interface AppointmentMapper {
     Appointment findById(@Param("id") Long id);
 
     int completeBooked(@Param("id") Long id);
+
+    IPage<DoctorAppointmentVO> pageForDoctor(
+            @Param("page") IPage<DoctorAppointmentVO> page,
+            @Param("doctorId") Long doctorId,
+            @Param("scheduleDate") LocalDate scheduleDate,
+            @Param("status") String status
+    );
+
+    int completeBookedByDoctor(@Param("id") Long id, @Param("doctorId") Long doctorId);
 
     List<AdminAppointmentVO> listForAdmin();
 

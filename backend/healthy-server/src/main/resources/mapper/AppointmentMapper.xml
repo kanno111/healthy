@@ -64,6 +64,33 @@
         WHERE id = #{id} AND status = 'BOOKED'
     </update>
 
+    <select id="pageForDoctor" resultType="com.healthy.appointment.vo.DoctorAppointmentVO">
+        SELECT appointment.id, appointment.appointment_no,
+               patient.real_name AS patient_name,
+               department.name AS department_name,
+               appointment.schedule_slot_id, appointment.schedule_date,
+               slot.session_name, appointment.start_time, appointment.end_time,
+               appointment.status
+        FROM appointment
+        INNER JOIN patient ON patient.id = appointment.patient_id
+        INNER JOIN doctor ON doctor.id = appointment.doctor_id
+        INNER JOIN department ON department.id = doctor.department_id
+        LEFT JOIN doctor_schedule_slot slot ON slot.id = appointment.schedule_slot_id
+        WHERE appointment.doctor_id = #{doctorId}
+          AND appointment.schedule_date = #{scheduleDate}
+          <if test="status != null">
+              AND appointment.status = #{status}
+          </if>
+        ORDER BY appointment.start_time ASC, appointment.id ASC
+    </select>
+
+    <update id="completeBookedByDoctor">
+        UPDATE appointment SET status = 'COMPLETED'
+        WHERE id = #{id}
+          AND doctor_id = #{doctorId}
+          AND status = 'BOOKED'
+    </update>
+
     <select id="listForAdmin" resultType="com.healthy.appointment.vo.AdminAppointmentVO">
         SELECT appointment.id, appointment.appointment_no,
                patient.real_name AS patient_name,

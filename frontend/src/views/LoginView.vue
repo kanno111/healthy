@@ -18,15 +18,15 @@ const registerForm = reactive({ username: '', password: '', name: '', phone: '',
 function switchMode(value: AuthMode) { mode.value = value; error.value = ''; notice.value = '' }
 function switchLoginRole(value: UserRole) {
   loginRole.value = value
-  account.value = value === 'PATIENT' ? 'patient_demo' : 'staff_demo'
-  password.value = '123456'
+  account.value = value === 'PATIENT' ? 'patient_demo' : value === 'STAFF' ? 'staff_demo' : ''
+  password.value = value === 'DOCTOR' ? '' : '123456'
   error.value = ''
 }
 async function login() {
   if (!account.value || !password.value) { error.value = '请输入账号和密码'; return }
   const result = await loginRequest(account.value, password.value)
   signIn(result)
-  await router.replace(result.role === 'STAFF' ? '/admin' : '/')
+  await router.replace(result.role === 'STAFF' ? '/admin' : result.role === 'DOCTOR' ? '/doctor/appointments' : '/')
 }
 async function register() {
   await registerRequest(registerForm)
@@ -63,6 +63,7 @@ async function submit() {
         <template v-if="mode === 'LOGIN'">
           <div class="role-switch">
             <button :class="{ active: loginRole === 'PATIENT' }" type="button" @click="switchLoginRole('PATIENT')"><b>患者</b><small>预约与查看就诊记录</small></button>
+            <button :class="{ active: loginRole === 'DOCTOR' }" type="button" @click="switchLoginRole('DOCTOR')"><b>医生</b><small>查看预约与完成就诊</small></button>
             <button :class="{ active: loginRole === 'STAFF' }" type="button" @click="switchLoginRole('STAFF')"><b>管理员</b><small>维护医生、排班与号源</small></button>
           </div>
           <label>账号<input v-model.trim="account" autocomplete="username" placeholder="请输入账号" :disabled="loading"></label>
@@ -78,7 +79,12 @@ async function submit() {
         <p v-if="error" class="form-error">{{ error }}</p><p v-if="notice" class="form-notice">{{ notice }}</p>
         <button class="login-submit" :disabled="loading">{{ loading ? '提交中…' : mode === 'LOGIN' ? '登录 →' : '注册患者账号 →' }}</button>
       </form>
-      <p v-if="mode === 'LOGIN'" class="demo-hint">演示账号密码均为 123456；管理员账号由管理端创建。</p>
+      <p v-if="mode === 'LOGIN'" class="demo-hint">患者和管理员演示账号密码为 123456；医生请使用已绑定的医生账号。</p>
     </div></section>
   </main>
 </template>
+
+<style scoped>
+.role-switch { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+@media (max-width: 560px) { .role-switch { grid-template-columns: 1fr; } }
+</style>

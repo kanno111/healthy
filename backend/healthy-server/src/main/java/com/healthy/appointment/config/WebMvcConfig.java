@@ -1,6 +1,7 @@
 package com.healthy.appointment.config;
 
 import com.healthy.appointment.interceptor.JwtAuthInterceptor;
+import com.healthy.appointment.interceptor.DoctorRoleInterceptor;
 import com.healthy.appointment.interceptor.PatientRoleInterceptor;
 import com.healthy.appointment.interceptor.StaffRoleInterceptor;
 import lombok.RequiredArgsConstructor;
@@ -14,6 +15,7 @@ public class WebMvcConfig implements WebMvcConfigurer {
     private final JwtAuthInterceptor jwtAuthInterceptor;
     private final StaffRoleInterceptor staffRoleInterceptor;
     private final PatientRoleInterceptor patientRoleInterceptor;
+    private final DoctorRoleInterceptor doctorRoleInterceptor;
 
     @Override
     public void addInterceptors(InterceptorRegistry registry) {
@@ -24,5 +26,7 @@ public class WebMvcConfig implements WebMvcConfigurer {
                 .addPathPatterns("/admin/**");
         registry.addInterceptor(patientRoleInterceptor)
                 .addPathPatterns("/user/**");
+        registry.addInterceptor(doctorRoleInterceptor)
+                .addPathPatterns("/doctor/**");
     }
 }

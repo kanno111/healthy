@@ -45,7 +45,21 @@
         FROM doctor doc
         INNER JOIN department dept ON dept.id = doc.department_id
         <include refid="doctorPageConditions"/>
-        ORDER BY doc.sort_order ASC, doc.id ASC
+        ORDER BY
+        <if test="availableFirst">
+            CASE WHEN EXISTS (
+                SELECT 1
+                FROM doctor_schedule_slot available_slot
+                WHERE available_slot.doctor_id = doc.id
+                  AND available_slot.schedule_date BETWEEN #{availabilityStartDate} AND #{availabilityEndDate}
+                  AND available_slot.status = 'OPEN'
+                  AND available_slot.remaining_capacity &gt; 0
+                  AND (available_slot.schedule_date &gt; #{availabilityStartDate}
+                       OR (available_slot.schedule_date = #{availabilityStartDate}
+                           AND available_slot.end_time &gt; #{currentTime}))
+            ) THEN 0 ELSE 1 END ASC,
+        </if>
+        doc.sort_order ASC, doc.id ASC
     </select>
 
     <select id="findById" resultType="com.healthy.appointment.vo.DoctorVO">
@@ -53,6 +67,21 @@
         FROM doctor doc
         INNER JOIN department dept ON dept.id = doc.department_id
         WHERE doc.id = #{id}
+    </select>
+
+    <select id="findEnabledByUserId" resultType="com.healthy.appointment.entity.Doctor">
+        SELECT doc.id, doc.user_id, doc.name, doc.gender, doc.department_id,
+               doc.doctor_code, doc.title, doc.introduction, doc.avatar_url,
+               doc.sort_order, doc.status, doc.created_at, doc.updated_at
+        FROM doctor doc
+        INNER JOIN sys_user account ON account.id = #{userId}
+        WHERE (doc.user_id = account.id
+               OR (doc.user_id IS NULL
+                   AND doc.doctor_code = account.username COLLATE utf8mb4_unicode_ci))
+          AND doc.status = 1
+          AND account.status = 1
+          AND account.role = 'DOCTOR'
+        LIMIT 1
     </select>
 
 </mapper>

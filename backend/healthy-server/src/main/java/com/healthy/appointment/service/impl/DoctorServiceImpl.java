@@ -17,7 +17,12 @@ import com.healthy.appointment.vo.DepartmentVO;
 import com.healthy.appointment.vo.DoctorVO;
 import org.springframework.stereotype.Service;
 
+import java.time.LocalDate;
+import java.time.LocalDateTime;
+import java.time.LocalTime;
 import java.util.List;
+
+import static com.healthy.appointment.constant.Constant.MAX_PATIENT_SCHEDULE_QUERY_DAYS;
 
 @Service
 public class DoctorServiceImpl extends ServiceImpl<DoctorMapper, Doctor> implements DoctorService {
@@ -39,12 +44,17 @@ public class DoctorServiceImpl extends ServiceImpl<DoctorMapper, Doctor> impleme
     @Override
     public PageResult<DoctorVO> page(String name, Long departmentId, Integer status, int page, int pageSize) {
         validateStatusIfPresent(status);
-        return pageDoctors(blankToNull(name), null, departmentId, status, null, page, pageSize);
+        return pageDoctors(blankToNull(name), null, departmentId, status, null,
+                false, null, null, null, page, pageSize);
     }
 
     @Override
     public PageResult<DoctorVO> pageVisible(Long departmentId, String keyword, int page, int pageSize) {
-        return pageDoctors(null, blankToNull(keyword), departmentId, 1, 1, page, pageSize);
+        LocalDateTime now = LocalDateTime.now();
+        LocalDate currentDate = now.toLocalDate();
+        return pageDoctors(null, blankToNull(keyword), departmentId, 1, 1,
+                true, currentDate, currentDate.plusDays(MAX_PATIENT_SCHEDULE_QUERY_DAYS - 1L),
+                now.toLocalTime(), page, pageSize);
     }
 
     private PageResult<DoctorVO> pageDoctors(
@@ -53,12 +63,17 @@ public class DoctorServiceImpl extends ServiceImpl<DoctorMapper, Doctor> impleme
             Long departmentId,
             Integer status,
             Integer departmentStatus,
+            boolean availableFirst,
+            LocalDate availabilityStartDate,
+            LocalDate availabilityEndDate,
+            LocalTime currentTime,
             int page,
             int pageSize
     ) {
         validatePage(page, pageSize);
         IPage<DoctorVO> result = doctorMapper.page(
-                new Page<>(page, pageSize), name, keyword, departmentId, status, departmentStatus);
+                new Page<>(page, pageSize), name, keyword, departmentId, status, departmentStatus,
+                availableFirst, availabilityStartDate, availabilityEndDate, currentTime);
         return PageResult.of(result.getRecords(), result.getTotal(), page, pageSize);
     }
 

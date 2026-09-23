@@ -1,22 +1,27 @@
-2026-09-22T14:21:35.396+08:00  INFO 17632 --- [appointment-api] [main] c.h.appointment.AppointmentApplication   : Starting AppointmentApplication using Java 21.0.6 with PID 17632 (D:\healthy\backend\healthy-server\target\classes started by 99796 in D:\healthy)
-2026-09-22T14:21:35.399+08:00  INFO 17632 --- [appointment-api] [main] c.h.appointment.AppointmentApplication   : No active profile set, falling back to 1 default profile: "local"
-2026-09-22T14:21:36.254+08:00  INFO 17632 --- [appointment-api] [main] .s.d.r.c.RepositoryConfigurationDelegate : Multiple Spring Data modules found, entering strict repository configuration mode
-2026-09-22T14:21:36.256+08:00  INFO 17632 --- [appointment-api] [main] .s.d.r.c.RepositoryConfigurationDelegate : Bootstrapping Spring Data Redis repositories in DEFAULT mode.
-2026-09-22T14:21:36.304+08:00  INFO 17632 --- [appointment-api] [main] .s.d.r.c.RepositoryConfigurationDelegate : Finished Spring Data repository scanning in 25 ms. Found 0 Redis repository interfaces.
-2026-09-22T14:21:36.887+08:00  INFO 17632 --- [appointment-api] [main] o.s.b.w.embedded.tomcat.TomcatWebServer  : Tomcat initialized with port 8080 (http)
-2026-09-22T14:21:36.900+08:00  INFO 17632 --- [appointment-api] [main] o.apache.catalina.core.StandardService   : Starting service [Tomcat]
-2026-09-22T14:21:36.900+08:00  INFO 17632 --- [appointment-api] [main] o.apache.catalina.core.StandardEngine    : Starting Servlet engine: [Apache Tomcat/10.1.36]
-2026-09-22T14:21:36.958+08:00  INFO 17632 --- [appointment-api] [main] o.a.c.c.C.[Tomcat].[localhost].[/api]    : Initializing Spring embedded WebApplicationContext
-2026-09-22T14:21:36.958+08:00  INFO 17632 --- [appointment-api] [main] w.s.c.ServletWebServerApplicationContext : Root WebApplicationContext: initialization completed in 1507 ms
-2026-09-22T14:21:38.707+08:00  INFO 17632 --- [appointment-api] [main] o.s.b.w.embedded.tomcat.TomcatWebServer  : Tomcat started on port 8080 (http) with context path '/api'
-2026-09-22T14:21:38.709+08:00  INFO 17632 --- [appointment-api] [main] o.s.a.r.c.CachingConnectionFactory       : Attempting to connect to: [localhost:5672]
-2026-09-22T14:21:38.744+08:00  INFO 17632 --- [appointment-api] [main] o.s.a.r.c.CachingConnectionFactory       : Created new connection: rabbitConnectionFactory#1f68e4e8:0/SimpleConnection@6e617c0e [delegate=amqp://guest@127.0.0.1:5672/, localPort=53508]
-2026-09-22T14:21:38.837+08:00  INFO 17632 --- [appointment-api] [main] c.h.appointment.AppointmentApplication   : Started AppointmentApplication in 4.003 seconds (process running for 4.891)
-2026-09-22T14:21:38.856+08:00  INFO 17632 --- [appointment-api] [main] com.zaxxer.hikari.HikariDataSource       : HikariPool-1 - Starting...
-2026-09-22T14:21:39.104+08:00  INFO 17632 --- [appointment-api] [main] com.zaxxer.hikari.pool.HikariPool        : HikariPool-1 - Added connection com.mysql.cj.jdbc.ConnectionImpl@6e612122
-2026-09-22T14:21:39.106+08:00  INFO 17632 --- [appointment-api] [main] com.zaxxer.hikari.HikariDataSource       : HikariPool-1 - Start completed.
-2026-09-22T14:21:50.652+08:00  INFO 17632 --- [appointment-api] [http-nio-8080-exec-1] o.a.c.c.C.[Tomcat].[localhost].[/api]    : Initializing Spring DispatcherServlet 'dispatcherServlet'
-2026-09-22T14:21:50.653+08:00  INFO 17632 --- [appointment-api] [http-nio-8080-exec-1] o.s.web.servlet.DispatcherServlet        : Initializing Servlet 'dispatcherServlet'
-2026-09-22T14:21:50.654+08:00  INFO 17632 --- [appointment-api] [http-nio-8080-exec-1] o.s.web.servlet.DispatcherServlet        : Completed initialization in 1 ms
-2026-09-22T14:26:31.204+08:00  INFO 17632 --- [appointment-api] [http-nio-8080-exec-8] c.h.a.s.impl.AppointmentServiceImpl      : Appointment booked successfully: appointmentId=1012, patientId=3, slotId=183
-2026-09-22T14:26:52.355+08:00  INFO 17632 --- [appointment-api] [http-nio-8080-exec-4] c.h.a.s.impl.AppointmentServiceImpl      : Appointment cancelled successfully: appointmentId=1012, patientId=3, slotId=183, stockDestination=PUBLIC
+2026-09-23T10:40:51.086+08:00  INFO 30272 --- [appointment-api] [main] c.h.appointment.AppointmentApplication   : Starting AppointmentApplication using Java 21.0.6 with PID 30272 (D:\healthy\backend\healthy-server\target\classes started by 99796 in D:\healthy)
+2026-09-23T10:40:51.090+08:00  INFO 30272 --- [appointment-api] [main] c.h.appointment.AppointmentApplication   : No active profile set, falling back to 1 default profile: "local"
+2026-09-23T10:40:51.919+08:00  INFO 30272 --- [appointment-api] [main] .s.d.r.c.RepositoryConfigurationDelegate : Multiple Spring Data modules found, entering strict repository configuration mode
+2026-09-23T10:40:51.921+08:00  INFO 30272 --- [appointment-api] [main] .s.d.r.c.RepositoryConfigurationDelegate : Bootstrapping Spring Data Redis repositories in DEFAULT mode.
+2026-09-23T10:40:51.974+08:00  INFO 30272 --- [appointment-api] [main] .s.d.r.c.RepositoryConfigurationDelegate : Finished Spring Data repository scanning in 28 ms. Found 0 Redis repository interfaces.
+2026-09-23T10:40:52.513+08:00  INFO 30272 --- [appointment-api] [main] o.s.b.w.embedded.tomcat.TomcatWebServer  : Tomcat initialized with port 8080 (http)
+2026-09-23T10:40:52.525+08:00  INFO 30272 --- [appointment-api] [main] o.apache.catalina.core.StandardService   : Starting service [Tomcat]
+2026-09-23T10:40:52.526+08:00  INFO 30272 --- [appointment-api] [main] o.apache.catalina.core.StandardEngine    : Starting Servlet engine: [Apache Tomcat/10.1.36]
+2026-09-23T10:40:52.577+08:00  INFO 30272 --- [appointment-api] [main] o.a.c.c.C.[Tomcat].[localhost].[/api]    : Initializing Spring embedded WebApplicationContext
+2026-09-23T10:40:52.578+08:00  INFO 30272 --- [appointment-api] [main] w.s.c.ServletWebServerApplicationContext : Root WebApplicationContext: initialization completed in 1441 ms
+2026-09-23T10:40:54.075+08:00  INFO 30272 --- [appointment-api] [main] o.s.b.w.embedded.tomcat.TomcatWebServer  : Tomcat started on port 8080 (http) with context path '/api'
+2026-09-23T10:40:54.077+08:00  INFO 30272 --- [appointment-api] [main] o.s.a.r.c.CachingConnectionFactory       : Attempting to connect to: [localhost:5672]
+2026-09-23T10:40:54.123+08:00  INFO 30272 --- [appointment-api] [main] o.s.a.r.c.CachingConnectionFactory       : Created new connection: rabbitConnectionFactory#45f1413c:0/SimpleConnection@129c322f [delegate=amqp://guest@127.0.0.1:5672/, localPort=51773]
+2026-09-23T10:40:54.266+08:00  INFO 30272 --- [appointment-api] [main] c.h.appointment.AppointmentApplication   : Started AppointmentApplication in 3.705 seconds (process running for 4.801)
+2026-09-23T10:40:54.291+08:00  INFO 30272 --- [appointment-api] [main] com.zaxxer.hikari.HikariDataSource       : HikariPool-1 - Starting...
+2026-09-23T10:40:54.539+08:00  INFO 30272 --- [appointment-api] [main] com.zaxxer.hikari.pool.HikariPool        : HikariPool-1 - Added connection com.mysql.cj.jdbc.ConnectionImpl@1a5a4f8
+2026-09-23T10:40:54.540+08:00  INFO 30272 --- [appointment-api] [main] com.zaxxer.hikari.HikariDataSource       : HikariPool-1 - Start completed.
+2026-09-23T10:41:08.543+08:00  INFO 30272 --- [appointment-api] [http-nio-8080-exec-1] o.a.c.c.C.[Tomcat].[localhost].[/api]    : Initializing Spring DispatcherServlet 'dispatcherServlet'
+2026-09-23T10:41:08.543+08:00  INFO 30272 --- [appointment-api] [http-nio-8080-exec-1] o.s.web.servlet.DispatcherServlet        : Initializing Servlet 'dispatcherServlet'
+2026-09-23T10:41:08.545+08:00  INFO 30272 --- [appointment-api] [http-nio-8080-exec-1] o.s.web.servlet.DispatcherServlet        : Completed initialization in 1 ms
+2026-09-23T10:41:24.292+08:00  INFO 30272 --- [appointment-api] [http-nio-8080-exec-9] c.h.a.s.i.DoctorAppointmentServiceImpl   : Doctor queried own appointments: userId=6, doctorId=1, scheduleDate=2026-09-23, status=null, page=1, pageSize=10, total=0
+2026-09-23T10:45:36.465+08:00  INFO 30272 --- [appointment-api] [org.springframework.amqp.rabbit.RabbitListenerEndpointContainer#0-2] o.s.a.r.l.SimpleMessageListenerContainer : Waiting for workers to finish.
+2026-09-23T10:45:37.279+08:00  INFO 30272 --- [appointment-api] [org.springframework.amqp.rabbit.RabbitListenerEndpointContainer#0-2] o.s.a.r.l.SimpleMessageListenerContainer : Successfully waited for workers to finish.
+2026-09-23T10:45:37.280+08:00  INFO 30272 --- [appointment-api] [SpringApplicationShutdownHook] o.s.b.w.e.tomcat.GracefulShutdown        : Commencing graceful shutdown. Waiting for active requests to complete
+2026-09-23T10:45:37.285+08:00  INFO 30272 --- [appointment-api] [tomcat-shutdown] o.s.b.w.e.tomcat.GracefulShutdown        : Graceful shutdown complete
+2026-09-23T10:45:37.302+08:00  INFO 30272 --- [appointment-api] [SpringApplicationShutdownHook] com.zaxxer.hikari.HikariDataSource       : HikariPool-1 - Shutdown initiated...
+2026-09-23T10:45:37.307+08:00  INFO 30272 --- [appointment-api] [SpringApplicationShutdownHook] com.zaxxer.hikari.HikariDataSource       : HikariPool-1 - Shutdown completed.

@@ -12,6 +12,7 @@ import java.time.LocalDateTime;
 public class Doctor {
     @TableId(type = IdType.AUTO)
     private Long id;
+    private Long userId;
     private String name;
     private Integer gender;
     private Long departmentId;
