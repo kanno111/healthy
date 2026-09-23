@@ -1,0 +1,47 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.healthy.appointment.mapper.AdminDashboardMapper">
+    <select id="getSummary" resultType="com.healthy.appointment.vo.AdminDashboardSummaryVO">
+        SELECT
+            #{date} AS date,
+            (
+                SELECT COUNT(*)
+                FROM doctor_schedule_slot
+                WHERE schedule_date = #{date}
+                  AND status = 'OPEN'
+            ) AS schedule_slot_count,
+            (
+                SELECT COALESCE(SUM(total_capacity), 0)
+                FROM doctor_schedule_slot
+                WHERE schedule_date = #{date}
+                  AND status = 'OPEN'
+            ) AS total_capacity,
+            (
+                SELECT COALESCE(SUM(remaining_capacity), 0)
+                FROM doctor_schedule_slot
+                WHERE schedule_date = #{date}
+                  AND status = 'OPEN'
+            ) AS remaining_capacity,
+            (
+                SELECT COUNT(*)
+                FROM appointment
+                WHERE schedule_date = #{date}
+                  AND status IN ('BOOKED', 'COMPLETED')
+            ) AS active_appointment_count,
+            (
+                SELECT COUNT(*)
+                FROM appointment_waitlist waitlist
+                INNER JOIN doctor_schedule_slot slot ON slot.id = waitlist.schedule_slot_id
+                WHERE slot.schedule_date = #{date}
+                  AND waitlist.status = 'WAITING'
+            ) AS waiting_count,
+            (
+                SELECT COUNT(*)
+                FROM appointment_waitlist
+                WHERE status = 'OFFERED'
+                  AND offer_expire_time &lt;= CURRENT_TIMESTAMP
+            ) AS overdue_offered_count
+    </select>
+</mapper>

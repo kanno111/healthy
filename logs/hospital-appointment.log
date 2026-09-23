@@ -25,3 +25,138 @@
 2026-09-23T10:45:37.285+08:00  INFO 30272 --- [appointment-api] [tomcat-shutdown] o.s.b.w.e.tomcat.GracefulShutdown        : Graceful shutdown complete
 2026-09-23T10:45:37.302+08:00  INFO 30272 --- [appointment-api] [SpringApplicationShutdownHook] com.zaxxer.hikari.HikariDataSource       : HikariPool-1 - Shutdown initiated...
 2026-09-23T10:45:37.307+08:00  INFO 30272 --- [appointment-api] [SpringApplicationShutdownHook] com.zaxxer.hikari.HikariDataSource       : HikariPool-1 - Shutdown completed.
+2026-09-23T16:55:14.802+08:00  INFO 28484 --- [appointment-api] [main] c.h.appointment.AppointmentApplication   : Starting AppointmentApplication using Java 21.0.6 with PID 28484 (D:\healthy\backend\healthy-server\target\classes started by 99796 in D:\healthy)
+2026-09-23T16:55:14.804+08:00  INFO 28484 --- [appointment-api] [main] c.h.appointment.AppointmentApplication   : No active profile set, falling back to 1 default profile: "local"
+2026-09-23T16:55:15.421+08:00  INFO 28484 --- [appointment-api] [main] .s.d.r.c.RepositoryConfigurationDelegate : Multiple Spring Data modules found, entering strict repository configuration mode
+2026-09-23T16:55:15.423+08:00  INFO 28484 --- [appointment-api] [main] .s.d.r.c.RepositoryConfigurationDelegate : Bootstrapping Spring Data Redis repositories in DEFAULT mode.
+2026-09-23T16:55:15.453+08:00  INFO 28484 --- [appointment-api] [main] .s.d.r.c.RepositoryConfigurationDelegate : Finished Spring Data repository scanning in 17 ms. Found 0 Redis repository interfaces.
+2026-09-23T16:55:15.925+08:00  INFO 28484 --- [appointment-api] [main] o.s.b.w.embedded.tomcat.TomcatWebServer  : Tomcat initialized with port 8080 (http)
+2026-09-23T16:55:15.936+08:00  INFO 28484 --- [appointment-api] [main] o.apache.catalina.core.StandardService   : Starting service [Tomcat]
+2026-09-23T16:55:15.937+08:00  INFO 28484 --- [appointment-api] [main] o.apache.catalina.core.StandardEngine    : Starting Servlet engine: [Apache Tomcat/10.1.36]
+2026-09-23T16:55:15.988+08:00  INFO 28484 --- [appointment-api] [main] o.a.c.c.C.[Tomcat].[localhost].[/api]    : Initializing Spring embedded WebApplicationContext
+2026-09-23T16:55:15.989+08:00  INFO 28484 --- [appointment-api] [main] w.s.c.ServletWebServerApplicationContext : Root WebApplicationContext: initialization completed in 1143 ms
+2026-09-23T16:55:16.549+08:00  INFO 28484 --- [appointment-api] [main] com.zaxxer.hikari.HikariDataSource       : HikariPool-1 - Starting...
+2026-09-23T16:55:16.775+08:00  INFO 28484 --- [appointment-api] [main] com.zaxxer.hikari.pool.HikariPool        : HikariPool-1 - Added connection com.mysql.cj.jdbc.ConnectionImpl@4fedf908
+2026-09-23T16:55:16.777+08:00  INFO 28484 --- [appointment-api] [main] com.zaxxer.hikari.HikariDataSource       : HikariPool-1 - Start completed.
+2026-09-23T16:55:16.814+08:00  INFO 28484 --- [appointment-api] [main] org.flywaydb.core.FlywayExecutor         : Database: jdbc:mysql://localhost:3306/healthy?useUnicode=true&characterEncoding=utf8&serverTimezone=Asia/Shanghai (MySQL 8.0)
+2026-09-23T16:55:16.891+08:00  INFO 28484 --- [appointment-api] [main] o.f.core.internal.command.DbValidate     : Successfully validated 11 migrations (execution time 00:00.044s)
+2026-09-23T16:55:16.921+08:00  INFO 28484 --- [appointment-api] [main] o.f.core.internal.command.DbMigrate      : Current version of schema `healthy`: 9
+2026-09-23T16:55:16.923+08:00  INFO 28484 --- [appointment-api] [main] o.f.core.internal.command.DbMigrate      : Schema `healthy` is up to date. No migration necessary.
+2026-09-23T16:55:17.976+08:00  INFO 28484 --- [appointment-api] [main] o.s.b.w.embedded.tomcat.TomcatWebServer  : Tomcat started on port 8080 (http) with context path '/api'
+2026-09-23T16:55:17.978+08:00  INFO 28484 --- [appointment-api] [main] o.s.a.r.c.CachingConnectionFactory       : Attempting to connect to: [localhost:5672]
+2026-09-23T16:55:18.023+08:00  INFO 28484 --- [appointment-api] [main] o.s.a.r.c.CachingConnectionFactory       : Created new connection: rabbitConnectionFactory#73d8c8d7:0/SimpleConnection@67216c33 [delegate=amqp://guest@127.0.0.1:5672/, localPort=50298]
+2026-09-23T16:55:18.169+08:00  INFO 28484 --- [appointment-api] [main] c.h.appointment.AppointmentApplication   : Started AppointmentApplication in 3.845 seconds (process running for 4.48)
+2026-09-23T16:55:18.240+08:00  INFO 28484 --- [appointment-api] [http-nio-8080-exec-1] o.a.c.c.C.[Tomcat].[localhost].[/api]    : Initializing Spring DispatcherServlet 'dispatcherServlet'
+2026-09-23T16:55:18.240+08:00  INFO 28484 --- [appointment-api] [http-nio-8080-exec-1] o.s.web.servlet.DispatcherServlet        : Initializing Servlet 'dispatcherServlet'
+2026-09-23T16:55:18.242+08:00  INFO 28484 --- [appointment-api] [http-nio-8080-exec-1] o.s.web.servlet.DispatcherServlet        : Completed initialization in 1 ms
+2026-09-23T17:49:24.553+08:00  INFO 28484 --- [appointment-api] [org.springframework.amqp.rabbit.RabbitListenerEndpointContainer#0-2] o.s.a.r.l.SimpleMessageListenerContainer : Waiting for workers to finish.
+2026-09-23T17:49:25.070+08:00  INFO 28484 --- [appointment-api] [org.springframework.amqp.rabbit.RabbitListenerEndpointContainer#0-2] o.s.a.r.l.SimpleMessageListenerContainer : Successfully waited for workers to finish.
+2026-09-23T17:49:25.074+08:00  INFO 28484 --- [appointment-api] [SpringApplicationShutdownHook] o.s.b.w.e.tomcat.GracefulShutdown        : Commencing graceful shutdown. Waiting for active requests to complete
+2026-09-23T17:49:25.091+08:00  INFO 28484 --- [appointment-api] [tomcat-shutdown] o.s.b.w.e.tomcat.GracefulShutdown        : Graceful shutdown complete
+2026-09-23T17:49:25.140+08:00  INFO 28484 --- [appointment-api] [SpringApplicationShutdownHook] com.zaxxer.hikari.HikariDataSource       : HikariPool-1 - Shutdown initiated...
+2026-09-23T17:49:25.148+08:00  INFO 28484 --- [appointment-api] [SpringApplicationShutdownHook] com.zaxxer.hikari.HikariDataSource       : HikariPool-1 - Shutdown completed.
+2026-09-23T17:49:39.460+08:00  INFO 24108 --- [appointment-api] [main] c.h.appointment.AppointmentApplication   : Starting AppointmentApplication using Java 21.0.6 with PID 24108 (D:\healthy\backend\healthy-server\target\classes started by 99796 in D:\healthy)
+2026-09-23T17:49:39.461+08:00  INFO 24108 --- [appointment-api] [main] c.h.appointment.AppointmentApplication   : No active profile set, falling back to 1 default profile: "local"
+2026-09-23T17:49:40.085+08:00  INFO 24108 --- [appointment-api] [main] .s.d.r.c.RepositoryConfigurationDelegate : Multiple Spring Data modules found, entering strict repository configuration mode
+2026-09-23T17:49:40.086+08:00  INFO 24108 --- [appointment-api] [main] .s.d.r.c.RepositoryConfigurationDelegate : Bootstrapping Spring Data Redis repositories in DEFAULT mode.
+2026-09-23T17:49:40.132+08:00  INFO 24108 --- [appointment-api] [main] .s.d.r.c.RepositoryConfigurationDelegate : Finished Spring Data repository scanning in 33 ms. Found 0 Redis repository interfaces.
+2026-09-23T17:49:40.633+08:00  INFO 24108 --- [appointment-api] [main] o.s.b.w.embedded.tomcat.TomcatWebServer  : Tomcat initialized with port 8080 (http)
+2026-09-23T17:49:40.651+08:00  INFO 24108 --- [appointment-api] [main] o.apache.catalina.core.StandardService   : Starting service [Tomcat]
+2026-09-23T17:49:40.651+08:00  INFO 24108 --- [appointment-api] [main] o.apache.catalina.core.StandardEngine    : Starting Servlet engine: [Apache Tomcat/10.1.36]
+2026-09-23T17:49:40.701+08:00  INFO 24108 --- [appointment-api] [main] o.a.c.c.C.[Tomcat].[localhost].[/api]    : Initializing Spring embedded WebApplicationContext
+2026-09-23T17:49:40.702+08:00  INFO 24108 --- [appointment-api] [main] w.s.c.ServletWebServerApplicationContext : Root WebApplicationContext: initialization completed in 1206 ms
+2026-09-23T17:49:41.118+08:00  INFO 24108 --- [appointment-api] [main] com.zaxxer.hikari.HikariDataSource       : HikariPool-1 - Starting...
+2026-09-23T17:49:41.375+08:00  INFO 24108 --- [appointment-api] [main] com.zaxxer.hikari.pool.HikariPool        : HikariPool-1 - Added connection com.mysql.cj.jdbc.ConnectionImpl@3cead673
+2026-09-23T17:49:41.376+08:00  INFO 24108 --- [appointment-api] [main] com.zaxxer.hikari.HikariDataSource       : HikariPool-1 - Start completed.
+2026-09-23T17:49:41.411+08:00  INFO 24108 --- [appointment-api] [main] org.flywaydb.core.FlywayExecutor         : Database: jdbc:mysql://localhost:3306/healthy?useUnicode=true&characterEncoding=utf8&serverTimezone=Asia/Shanghai (MySQL 8.0)
+2026-09-23T17:49:41.466+08:00  INFO 24108 --- [appointment-api] [main] o.f.core.internal.command.DbValidate     : Successfully validated 11 migrations (execution time 00:00.034s)
+2026-09-23T17:49:41.483+08:00  INFO 24108 --- [appointment-api] [main] o.f.core.internal.command.DbMigrate      : Current version of schema `healthy`: 9
+2026-09-23T17:49:41.486+08:00  INFO 24108 --- [appointment-api] [main] o.f.core.internal.command.DbMigrate      : Schema `healthy` is up to date. No migration necessary.
+2026-09-23T17:49:42.366+08:00  INFO 24108 --- [appointment-api] [main] o.s.b.w.embedded.tomcat.TomcatWebServer  : Tomcat started on port 8080 (http) with context path '/api'
+2026-09-23T17:49:42.368+08:00  INFO 24108 --- [appointment-api] [main] o.s.a.r.c.CachingConnectionFactory       : Attempting to connect to: [localhost:5672]
+2026-09-23T17:49:42.397+08:00  INFO 24108 --- [appointment-api] [main] o.s.a.r.c.CachingConnectionFactory       : Created new connection: rabbitConnectionFactory#352ce817:0/SimpleConnection@19656e21 [delegate=amqp://guest@127.0.0.1:5672/, localPort=51779]
+2026-09-23T17:49:42.483+08:00  INFO 24108 --- [appointment-api] [main] c.h.appointment.AppointmentApplication   : Started AppointmentApplication in 3.441 seconds (process running for 4.393)
+2026-09-23T17:49:42.850+08:00  INFO 24108 --- [appointment-api] [http-nio-8080-exec-1] o.a.c.c.C.[Tomcat].[localhost].[/api]    : Initializing Spring DispatcherServlet 'dispatcherServlet'
+2026-09-23T17:49:42.851+08:00  INFO 24108 --- [appointment-api] [http-nio-8080-exec-1] o.s.web.servlet.DispatcherServlet        : Initializing Servlet 'dispatcherServlet'
+2026-09-23T17:49:42.852+08:00  INFO 24108 --- [appointment-api] [http-nio-8080-exec-1] o.s.web.servlet.DispatcherServlet        : Completed initialization in 1 ms
+2026-09-23T18:00:26.697+08:00  WARN 24108 --- [appointment-api] [HikariPool-1 housekeeper] com.zaxxer.hikari.pool.HikariPool        : HikariPool-1 - Thread starvation or clock leap detected (housekeeper delta=2m15s75ms447µs600ns).
+2026-09-23T18:00:57.210+08:00  INFO 24108 --- [appointment-api] [org.springframework.amqp.rabbit.RabbitListenerEndpointContainer#0-2] o.s.a.r.l.SimpleMessageListenerContainer : Waiting for workers to finish.
+2026-09-23T18:00:57.818+08:00  INFO 24108 --- [appointment-api] [org.springframework.amqp.rabbit.RabbitListenerEndpointContainer#0-2] o.s.a.r.l.SimpleMessageListenerContainer : Successfully waited for workers to finish.
+2026-09-23T18:00:57.819+08:00  INFO 24108 --- [appointment-api] [SpringApplicationShutdownHook] o.s.b.w.e.tomcat.GracefulShutdown        : Commencing graceful shutdown. Waiting for active requests to complete
+2026-09-23T18:00:57.825+08:00  INFO 24108 --- [appointment-api] [tomcat-shutdown] o.s.b.w.e.tomcat.GracefulShutdown        : Graceful shutdown complete
+2026-09-23T18:00:57.843+08:00  INFO 24108 --- [appointment-api] [SpringApplicationShutdownHook] com.zaxxer.hikari.HikariDataSource       : HikariPool-1 - Shutdown initiated...
+2026-09-23T18:00:57.848+08:00  INFO 24108 --- [appointment-api] [SpringApplicationShutdownHook] com.zaxxer.hikari.HikariDataSource       : HikariPool-1 - Shutdown completed.
+2026-09-23T18:24:05.252+08:00  INFO 21984 --- [appointment-api] [main] c.h.appointment.AppointmentApplication   : Starting AppointmentApplication using Java 21.0.6 with PID 21984 (D:\healthy\backend\healthy-server\target\classes started by 99796 in D:\healthy)
+2026-09-23T18:24:05.254+08:00  INFO 21984 --- [appointment-api] [main] c.h.appointment.AppointmentApplication   : No active profile set, falling back to 1 default profile: "local"
+2026-09-23T18:24:05.886+08:00  INFO 21984 --- [appointment-api] [main] .s.d.r.c.RepositoryConfigurationDelegate : Multiple Spring Data modules found, entering strict repository configuration mode
+2026-09-23T18:24:05.888+08:00  INFO 21984 --- [appointment-api] [main] .s.d.r.c.RepositoryConfigurationDelegate : Bootstrapping Spring Data Redis repositories in DEFAULT mode.
+2026-09-23T18:24:05.917+08:00  INFO 21984 --- [appointment-api] [main] .s.d.r.c.RepositoryConfigurationDelegate : Finished Spring Data repository scanning in 17 ms. Found 0 Redis repository interfaces.
+2026-09-23T18:24:06.492+08:00  INFO 21984 --- [appointment-api] [main] o.s.b.w.embedded.tomcat.TomcatWebServer  : Tomcat initialized with port 8080 (http)
+2026-09-23T18:24:06.514+08:00  INFO 21984 --- [appointment-api] [main] o.apache.catalina.core.StandardService   : Starting service [Tomcat]
+2026-09-23T18:24:06.515+08:00  INFO 21984 --- [appointment-api] [main] o.apache.catalina.core.StandardEngine    : Starting Servlet engine: [Apache Tomcat/10.1.36]
+2026-09-23T18:24:06.564+08:00  INFO 21984 --- [appointment-api] [main] o.a.c.c.C.[Tomcat].[localhost].[/api]    : Initializing Spring embedded WebApplicationContext
+2026-09-23T18:24:06.564+08:00  INFO 21984 --- [appointment-api] [main] w.s.c.ServletWebServerApplicationContext : Root WebApplicationContext: initialization completed in 1265 ms
+2026-09-23T18:24:07.027+08:00  INFO 21984 --- [appointment-api] [main] com.zaxxer.hikari.HikariDataSource       : HikariPool-1 - Starting...
+2026-09-23T18:24:07.258+08:00  INFO 21984 --- [appointment-api] [main] com.zaxxer.hikari.pool.HikariPool        : HikariPool-1 - Added connection com.mysql.cj.jdbc.ConnectionImpl@54941dfd
+2026-09-23T18:24:07.261+08:00  INFO 21984 --- [appointment-api] [main] com.zaxxer.hikari.HikariDataSource       : HikariPool-1 - Start completed.
+2026-09-23T18:24:07.320+08:00  INFO 21984 --- [appointment-api] [main] org.flywaydb.core.FlywayExecutor         : Database: jdbc:mysql://localhost:3306/healthy?useUnicode=true&characterEncoding=utf8&serverTimezone=Asia/Shanghai (MySQL 8.0)
+2026-09-23T18:24:07.375+08:00  INFO 21984 --- [appointment-api] [main] o.f.core.internal.command.DbValidate     : Successfully validated 11 migrations (execution time 00:00.033s)
+2026-09-23T18:24:07.395+08:00  INFO 21984 --- [appointment-api] [main] o.f.core.internal.command.DbMigrate      : Current version of schema `healthy`: 9
+2026-09-23T18:24:07.397+08:00  INFO 21984 --- [appointment-api] [main] o.f.core.internal.command.DbMigrate      : Schema `healthy` is up to date. No migration necessary.
+2026-09-23T18:24:08.359+08:00  WARN 21984 --- [appointment-api] [main] ConfigServletWebServerApplicationContext : Exception encountered during context initialization - cancelling refresh attempt: org.springframework.context.ApplicationContextException: Failed to start bean 'webServerStartStop'
+2026-09-23T18:24:08.367+08:00  INFO 21984 --- [appointment-api] [main] com.zaxxer.hikari.HikariDataSource       : HikariPool-1 - Shutdown initiated...
+2026-09-23T18:24:08.372+08:00  INFO 21984 --- [appointment-api] [main] com.zaxxer.hikari.HikariDataSource       : HikariPool-1 - Shutdown completed.
+2026-09-23T18:24:08.381+08:00  INFO 21984 --- [appointment-api] [main] .s.b.a.l.ConditionEvaluationReportLogger : 
+
+Error starting ApplicationContext. To display the condition evaluation report re-run your application with 'debug' enabled.
+2026-09-23T18:24:08.393+08:00 ERROR 21984 --- [appointment-api] [main] o.s.b.d.LoggingFailureAnalysisReporter   : 
+
+***************************
+APPLICATION FAILED TO START
+***************************
+
+Description:
+
+Web server failed to start. Port 8080 was already in use.
+
+Action:
+
+Identify and stop the process that's listening on port 8080 or configure this application to listen on another port.
+
+2026-09-23T18:30:08.599+08:00  INFO 27972 --- [appointment-api] [main] c.h.appointment.AppointmentApplication   : Starting AppointmentApplication using Java 21.0.6 with PID 27972 (D:\healthy\backend\healthy-server\target\classes started by 99796 in D:\healthy)
+2026-09-23T18:30:08.601+08:00  INFO 27972 --- [appointment-api] [main] c.h.appointment.AppointmentApplication   : No active profile set, falling back to 1 default profile: "local"
+2026-09-23T18:30:09.257+08:00  INFO 27972 --- [appointment-api] [main] .s.d.r.c.RepositoryConfigurationDelegate : Multiple Spring Data modules found, entering strict repository configuration mode
+2026-09-23T18:30:09.259+08:00  INFO 27972 --- [appointment-api] [main] .s.d.r.c.RepositoryConfigurationDelegate : Bootstrapping Spring Data Redis repositories in DEFAULT mode.
+2026-09-23T18:30:09.290+08:00  INFO 27972 --- [appointment-api] [main] .s.d.r.c.RepositoryConfigurationDelegate : Finished Spring Data repository scanning in 18 ms. Found 0 Redis repository interfaces.
+2026-09-23T18:30:09.810+08:00  INFO 27972 --- [appointment-api] [main] o.s.b.w.embedded.tomcat.TomcatWebServer  : Tomcat initialized with port 8080 (http)
+2026-09-23T18:30:09.822+08:00  INFO 27972 --- [appointment-api] [main] o.apache.catalina.core.StandardService   : Starting service [Tomcat]
+2026-09-23T18:30:09.822+08:00  INFO 27972 --- [appointment-api] [main] o.apache.catalina.core.StandardEngine    : Starting Servlet engine: [Apache Tomcat/10.1.36]
+2026-09-23T18:30:09.880+08:00  INFO 27972 --- [appointment-api] [main] o.a.c.c.C.[Tomcat].[localhost].[/api]    : Initializing Spring embedded WebApplicationContext
+2026-09-23T18:30:09.880+08:00  INFO 27972 --- [appointment-api] [main] w.s.c.ServletWebServerApplicationContext : Root WebApplicationContext: initialization completed in 1236 ms
+2026-09-23T18:30:10.416+08:00  INFO 27972 --- [appointment-api] [main] com.zaxxer.hikari.HikariDataSource       : HikariPool-1 - Starting...
+2026-09-23T18:30:10.666+08:00  INFO 27972 --- [appointment-api] [main] com.zaxxer.hikari.pool.HikariPool        : HikariPool-1 - Added connection com.mysql.cj.jdbc.ConnectionImpl@516c20de
+2026-09-23T18:30:10.667+08:00  INFO 27972 --- [appointment-api] [main] com.zaxxer.hikari.HikariDataSource       : HikariPool-1 - Start completed.
+2026-09-23T18:30:10.700+08:00  INFO 27972 --- [appointment-api] [main] org.flywaydb.core.FlywayExecutor         : Database: jdbc:mysql://localhost:3306/healthy?useUnicode=true&characterEncoding=utf8&serverTimezone=Asia/Shanghai (MySQL 8.0)
+2026-09-23T18:30:10.743+08:00  INFO 27972 --- [appointment-api] [main] o.f.core.internal.command.DbValidate     : Successfully validated 11 migrations (execution time 00:00.026s)
+2026-09-23T18:30:10.759+08:00  INFO 27972 --- [appointment-api] [main] o.f.core.internal.command.DbMigrate      : Current version of schema `healthy`: 9
+2026-09-23T18:30:10.763+08:00  INFO 27972 --- [appointment-api] [main] o.f.core.internal.command.DbMigrate      : Schema `healthy` is up to date. No migration necessary.
+2026-09-23T18:30:11.735+08:00  WARN 27972 --- [appointment-api] [main] ConfigServletWebServerApplicationContext : Exception encountered during context initialization - cancelling refresh attempt: org.springframework.context.ApplicationContextException: Failed to start bean 'webServerStartStop'
+2026-09-23T18:30:11.744+08:00  INFO 27972 --- [appointment-api] [main] com.zaxxer.hikari.HikariDataSource       : HikariPool-1 - Shutdown initiated...
+2026-09-23T18:30:11.749+08:00  INFO 27972 --- [appointment-api] [main] com.zaxxer.hikari.HikariDataSource       : HikariPool-1 - Shutdown completed.
+2026-09-23T18:30:11.758+08:00  INFO 27972 --- [appointment-api] [main] .s.b.a.l.ConditionEvaluationReportLogger : 
+
+Error starting ApplicationContext. To display the condition evaluation report re-run your application with 'debug' enabled.
+2026-09-23T18:30:11.772+08:00 ERROR 27972 --- [appointment-api] [main] o.s.b.d.LoggingFailureAnalysisReporter   : 
+
+***************************
+APPLICATION FAILED TO START
+***************************
+
+Description:
+
+Web server failed to start. Port 8080 was already in use.
+
+Action:
+
+Identify and stop the process that's listening on port 8080 or configure this application to listen on another port.
+

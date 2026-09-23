@@ -68,7 +68,16 @@ public class AppointmentServiceImpl implements AppointmentService {
             throw new BusinessException(ErrorCode.CONFLICT);
         }
         restoreRedisStockIfTransactionDoesNotCommit(slotId);
-        DoctorScheduleSlot slot = getAvailableSlot(slotId);
+        DoctorScheduleSlot slot;
+        try {
+            slot = getAvailableSlot(slotId);
+        } catch (BusinessException exception) {
+            // Redis has already reserved one unit, but MySQL rejected the slot before the
+            // conditional stock update. Schedule a delayed comparison so stale positive
+            // Redis stock (for example Redis > 0 while MySQL = 0) can be removed safely.
+            appointmentStockRepairService.triggerAfterMysqlStockReject(slotId);
+            throw exception;
+        }
         //校验影响行数，确保未抢到号时立刻抛出异常
         if (doctorScheduleSlotMapper.decreaseRemainingCapacity(slot.getId()) != 1) {
             // Redis 已预扣但 MySQL 最终条件校验失败。事务回滚回调会恢复 Redis；

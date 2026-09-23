@@ -100,6 +100,7 @@ class AppointmentServiceImplTest {
 
         verify(doctorScheduleSlotMapper, never()).decreaseRemainingCapacity(10L);
         verify(appointmentMapper, never()).insert(any());
+        verify(appointmentStockRepairService).triggerAfterMysqlStockReject(10L);
     }
 
     @Test
@@ -162,6 +163,7 @@ class AppointmentServiceImplTest {
 
         verify(appointmentStockService, never()).initializeIfAbsent(10L, 0);
         verify(appointmentStockService, times(1)).preDeduct(10L);
+        verify(appointmentStockRepairService, never()).triggerAfterMysqlStockReject(10L);
     }
 
     @Test
