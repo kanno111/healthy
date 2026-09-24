@@ -90,7 +90,7 @@ services:
       - healthy-network
 
   redis:
-    image: redis:7.4-alpine
+    image: public.ecr.aws/docker/library/redis:7.4.11-alpine3.21
     restart: unless-stopped
     environment:
       TZ: ${TZ:-Asia/Shanghai}
