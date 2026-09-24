@@ -109,7 +109,7 @@ services:
       - healthy-network
 
   rabbitmq:
-    image: rabbitmq:4.1-management-alpine
+    image: public.ecr.aws/docker/library/rabbitmq:4.1.8-management-alpine
     restart: unless-stopped
     environment:
       TZ: ${TZ:-Asia/Shanghai}
