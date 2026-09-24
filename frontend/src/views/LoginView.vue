@@ -8,8 +8,8 @@ type AuthMode = 'LOGIN' | 'REGISTER'
 const router = useRouter()
 const mode = ref<AuthMode>('LOGIN')
 const loginRole = ref<UserRole>('PATIENT')
-const account = ref('patient_demo')
-const password = ref('123456')
+const account = ref('')
+const password = ref('')
 const error = ref('')
 const notice = ref('')
 const loading = ref(false)
@@ -18,8 +18,8 @@ const registerForm = reactive({ username: '', password: '', name: '', phone: '',
 function switchMode(value: AuthMode) { mode.value = value; error.value = ''; notice.value = '' }
 function switchLoginRole(value: UserRole) {
   loginRole.value = value
-  account.value = value === 'PATIENT' ? 'patient_demo' : value === 'STAFF' ? 'staff_demo' : ''
-  password.value = value === 'DOCTOR' ? '' : '123456'
+  account.value = ''
+  password.value = ''
   error.value = ''
 }
 async function login() {
@@ -79,7 +79,6 @@ async function submit() {
         <p v-if="error" class="form-error">{{ error }}</p><p v-if="notice" class="form-notice">{{ notice }}</p>
         <button class="login-submit" :disabled="loading">{{ loading ? '提交中…' : mode === 'LOGIN' ? '登录 →' : '注册患者账号 →' }}</button>
       </form>
-      <p v-if="mode === 'LOGIN'" class="demo-hint">患者和管理员演示账号密码为 123456；医生请使用已绑定的医生账号。</p>
     </div></section>
   </main>
 </template>
