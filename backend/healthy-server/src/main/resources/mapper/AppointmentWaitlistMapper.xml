@@ -20,6 +20,32 @@
         FOR UPDATE
     </select>
 
+    <select id="selectExpiredWaiting" resultType="com.healthy.appointment.entity.AppointmentWaitlist">
+        SELECT waitlist.id, waitlist.patient_id, waitlist.schedule_slot_id, waitlist.status,
+               waitlist.offer_expire_time, waitlist.created_at, waitlist.updated_at
+        FROM appointment_waitlist waitlist
+        INNER JOIN doctor_schedule_slot slot ON slot.id = waitlist.schedule_slot_id
+        WHERE waitlist.status = 'WAITING'
+          AND (
+              slot.schedule_date &lt; DATE(#{now})
+              OR (slot.schedule_date = DATE(#{now}) AND slot.end_time &lt;= TIME(#{now}))
+          )
+        ORDER BY slot.schedule_date ASC, slot.end_time ASC, waitlist.id ASC
+        LIMIT #{limit}
+    </select>
+
+    <update id="expireWaitingIfSlotEnded">
+        UPDATE appointment_waitlist waitlist
+        INNER JOIN doctor_schedule_slot slot ON slot.id = waitlist.schedule_slot_id
+        SET waitlist.status = 'EXPIRED', waitlist.offer_expire_time = NULL
+        WHERE waitlist.id = #{waitlistId}
+          AND waitlist.status = 'WAITING'
+          AND (
+              slot.schedule_date &lt; DATE(#{now})
+              OR (slot.schedule_date = DATE(#{now}) AND slot.end_time &lt;= TIME(#{now}))
+          )
+    </update>
+
     <select id="listByPatientId" resultType="com.healthy.appointment.vo.PatientAppointmentWaitlistVO">
         SELECT <include refid="patientWaitlistColumns"/>
         FROM appointment_waitlist waitlist

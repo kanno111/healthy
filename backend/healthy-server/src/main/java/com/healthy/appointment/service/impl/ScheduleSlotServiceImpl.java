@@ -19,6 +19,7 @@ import org.springframework.transaction.support.TransactionSynchronization;
 import org.springframework.transaction.support.TransactionSynchronizationManager;
 
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.time.LocalTime;
 import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
@@ -75,6 +76,9 @@ public class ScheduleSlotServiceImpl implements ScheduleSlotService {
     public void updateStatus(Long id, String status) {
         String normalizedStatus = normalizeStatus(status);
         DoctorScheduleSlot slot = getSlotById(id);
+        if (SCHEDULE_STATUS_OPEN.equals(normalizedStatus) && hasEnded(slot, LocalDateTime.now())) {
+            throw new BusinessException(ErrorCode.CONFLICT);
+        }
         if (doctorScheduleSlotMapper.updateStatus(id, normalizedStatus, slot.getVersion()) != 1) {
             throw new BusinessException(ErrorCode.CONFLICT);
         }
@@ -245,6 +249,12 @@ public class ScheduleSlotServiceImpl implements ScheduleSlotService {
             throw new BusinessException(ErrorCode.VALIDATION_ERROR);
         }
         return normalizedStatus;
+    }
+
+    private boolean hasEnded(DoctorScheduleSlot slot, LocalDateTime now) {
+        return slot.getScheduleDate().isBefore(now.toLocalDate())
+                || (slot.getScheduleDate().equals(now.toLocalDate())
+                && !slot.getEndTime().isAfter(now.toLocalTime()));
     }
 
     private void runAfterCommit(Runnable action) {

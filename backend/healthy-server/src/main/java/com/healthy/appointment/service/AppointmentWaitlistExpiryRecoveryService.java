@@ -67,6 +67,40 @@ public class AppointmentWaitlistExpiryRecoveryService {
         return new RecoveryResult(candidates.size(), expired, skipped, failed);
     }
 
+    public RecoveryResult recoverExpiredWaiting() {
+        int batchSize = Math.max(1,
+                Math.min(appointmentWaitlistProperties.getRecoveryBatchSize(), MAX_BATCH_SIZE));
+        LocalDateTime now = LocalDateTime.now();
+        List<AppointmentWaitlist> candidates =
+                appointmentWaitlistMapper.selectExpiredWaiting(now, batchSize);
+
+        int expired = 0;
+        int skipped = 0;
+        int failed = 0;
+        for (AppointmentWaitlist candidate : candidates) {
+            log.warn("Scheduled scan found WAITING waitlist after schedule ended: waitlistId={}, patientId={}, slotId={}, oldStatus={}",
+                    candidate.getId(), candidate.getPatientId(), candidate.getScheduleSlotId(),
+                    candidate.getStatus());
+            try {
+                if (appointmentWaitlistService.expireWaiting(candidate.getId())) {
+                    expired++;
+                    log.info("Scheduled compensation processed successfully: waitlistId={}, patientId={}, slotId={}, oldStatus={}, newStatus={}",
+                            candidate.getId(), candidate.getPatientId(), candidate.getScheduleSlotId(),
+                            candidate.getStatus(), WAITLIST_STATUS_EXPIRED);
+                } else {
+                    skipped++;
+                    log.warn("Scheduled WAITING expiry skipped because business state already changed: waitlistId={}, patientId={}, slotId={}, affectedRows=0",
+                            candidate.getId(), candidate.getPatientId(), candidate.getScheduleSlotId());
+                }
+            } catch (RuntimeException exception) {
+                failed++;
+                log.error("WAITING waitlist expiry recovery candidate failed: waitlistId={}, reason={}",
+                        candidate.getId(), exception.getMessage(), exception);
+            }
+        }
+        return new RecoveryResult(candidates.size(), expired, skipped, failed);
+    }
+
     public record RecoveryResult(int scanned, int expired, int skipped, int failed) {
     }
 }

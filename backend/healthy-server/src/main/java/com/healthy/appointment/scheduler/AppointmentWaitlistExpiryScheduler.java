@@ -16,6 +16,18 @@ public class AppointmentWaitlistExpiryScheduler {
     @Scheduled(fixedDelayString = "${appointment.waitlist.offer-expire-check-delay:2m}")
     public void expireDueOffers() {
         try {
+            AppointmentWaitlistExpiryRecoveryService.RecoveryResult waitingResult =
+                    recoveryService.recoverExpiredWaiting();
+            if (waitingResult.scanned() > 0) {
+                log.info("Expired WAITING waitlist recovery completed: scanned={}, expired={}, skipped={}, failed={}",
+                        waitingResult.scanned(), waitingResult.expired(),
+                        waitingResult.skipped(), waitingResult.failed());
+            }
+        } catch (RuntimeException exception) {
+            log.error("WAITING waitlist expiry task failed: operation=EXPIRE_ENDED_WAITING, reason={}",
+                    exception.getMessage(), exception);
+        }
+        try {
             AppointmentWaitlistExpiryRecoveryService.RecoveryResult result = recoveryService.recoverDueOffers();
             if (result.scanned() > 0) {
                 log.info("Waitlist offer expiry recovery completed: scanned={}, expired={}, skipped={}, failed={}",

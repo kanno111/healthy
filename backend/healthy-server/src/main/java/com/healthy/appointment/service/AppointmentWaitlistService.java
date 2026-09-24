@@ -23,4 +23,7 @@ public interface AppointmentWaitlistService {
 
     /** @return true only when this call changed OFFERED to EXPIRED. */
     boolean expireOffered(Long waitlistId);
+
+    /** @return true only when an ended slot's WAITING entry was changed to EXPIRED. */
+    boolean expireWaiting(Long waitlistId);
 }

@@ -3,6 +3,11 @@
 .DS_Store
 Thumbs.db
 
+# Local deployment secrets
+.env
+.env.*
+!.env.example
+
 # Java / Maven
 backend/**/target/
 backend/.env
@@ -17,3 +22,7 @@ frontend/*.tsbuildinfo
 # Nginx runtime files
 nginx/**/logs/
 nginx/**/temp/
+
+# Runtime logs
+backend/logs/*.log
+log/*.log

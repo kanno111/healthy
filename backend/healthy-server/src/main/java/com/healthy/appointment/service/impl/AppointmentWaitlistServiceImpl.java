@@ -51,13 +51,17 @@ public class AppointmentWaitlistServiceImpl implements AppointmentWaitlistServic
     private final WaitlistTimeoutMessagePublisher waitlistTimeoutMessagePublisher;
 
     @Override
+    @Transactional(rollbackFor = Exception.class)
     public PatientAppointmentWaitlistVO join(
             Long userId,
             AppointmentWaitlistCreateDTO appointmentWaitlistCreateDTO
     ) {
         Long patientId = findEnabledPatientId(userId);
         Long slotId = appointmentWaitlistCreateDTO.getScheduleSlotId();
-        DoctorScheduleSlot slot = doctorScheduleSlotMapper.findById(slotId);
+        // Serialize the final "stock is still zero" check with cancellation/release for this slot.
+        // Otherwise a cancellation could restore public stock immediately after this check while
+        // this request still inserts a WAITING record.
+        DoctorScheduleSlot slot = doctorScheduleSlotMapper.findByIdForUpdate(slotId);
         ensureWaitlistable(slot);
 
         if (appointmentMapper.findActiveByPatientIdAndScheduleSlotId(patientId, slotId) != null) {
@@ -86,8 +90,9 @@ public class AppointmentWaitlistServiceImpl implements AppointmentWaitlistServic
         }
 
         PatientAppointmentWaitlistVO result = appointmentWaitlistMapper.findByIdAndPatientId(waitlist.getId(), patientId);
-        log.info("Joined appointment waitlist successfully: waitlistId={}, patientId={}, slotId={}, oldStatus={}, newStatus={}, offerExpireTime={}",
-                waitlist.getId(), patientId, slotId, null, WAITLIST_STATUS_WAITING, null);
+        runAfterCommit(() -> log.info(
+                "Joined appointment waitlist successfully: waitlistId={}, patientId={}, slotId={}, oldStatus={}, newStatus={}, offerExpireTime={}",
+                waitlist.getId(), patientId, slotId, null, WAITLIST_STATUS_WAITING, null));
         return result;
     }
 
@@ -125,8 +130,15 @@ public class AppointmentWaitlistServiceImpl implements AppointmentWaitlistServic
     public boolean offerFirstWaiting(Long scheduleSlotId) {
         // Serialize allocation for one slot before locking a FIFO waitlist row. This avoids
         // InnoDB next-key-lock deadlocks when two cancellations release the same slot together.
-        if (doctorScheduleSlotMapper.findByIdForUpdate(scheduleSlotId) == null) {
+        DoctorScheduleSlot slot = doctorScheduleSlotMapper.findByIdForUpdate(scheduleSlotId);
+        if (slot == null) {
             throw new BusinessException(ErrorCode.NOT_FOUND);
+        }
+        LocalDateTime now = LocalDateTime.now();
+        if (!SCHEDULE_STATUS_OPEN.equals(slot.getStatus()) || hasEnded(slot, now)) {
+            log.warn("Waitlist offer skipped because schedule slot is unavailable: slotId={}, status={}, scheduleDate={}, endTime={}",
+                    scheduleSlotId, slot.getStatus(), slot.getScheduleDate(), slot.getEndTime());
+            return false;
         }
         AppointmentWaitlist waiting = appointmentWaitlistMapper.selectFirstWaitingForUpdate(scheduleSlotId);
         if (waiting == null) {
@@ -144,7 +156,7 @@ public class AppointmentWaitlistServiceImpl implements AppointmentWaitlistServic
             // a caller to return the reserved capacity to public stock while a waiter still exists.
             throw new BusinessException(ErrorCode.CONFLICT);
         }
-        logAfterCommit(() -> log.info(
+        runAfterCommit(() -> log.info(
                 "Waitlist status changed: waitlistId={}, patientId={}, slotId={}, oldStatus={}, newStatus={}, offerExpireTime={}",
                 waiting.getId(), waiting.getPatientId(), scheduleSlotId,
                 WAITLIST_STATUS_WAITING, WAITLIST_STATUS_OFFERED, offerExpireTime));
@@ -176,6 +188,9 @@ public class AppointmentWaitlistServiceImpl implements AppointmentWaitlistServic
         if (slot == null) {
             throw new BusinessException(ErrorCode.NOT_FOUND);
         }
+        if (!SCHEDULE_STATUS_OPEN.equals(slot.getStatus()) || hasEnded(slot, now)) {
+            throw new BusinessException(ErrorCode.CONFLICT);
+        }
 
         int confirmed = appointmentWaitlistMapper.update(null, new LambdaUpdateWrapper<AppointmentWaitlist>()
                 .eq(AppointmentWaitlist::getId, waitlistId)
@@ -204,7 +219,7 @@ public class AppointmentWaitlistServiceImpl implements AppointmentWaitlistServic
         } catch (DuplicateKeyException exception) {
             throw new BusinessException(ErrorCode.CONFLICT);
         }
-        logAfterCommit(() -> log.info(
+        runAfterCommit(() -> log.info(
                 "Waitlist status changed: waitlistId={}, patientId={}, slotId={}, oldStatus={}, newStatus={}, offerExpireTime={}",
                 waitlistId, patientId, waitlist.getScheduleSlotId(),
                 WAITLIST_STATUS_OFFERED, WAITLIST_STATUS_CONFIRMED, waitlist.getOfferExpireTime()));
@@ -226,20 +241,38 @@ public class AppointmentWaitlistServiceImpl implements AppointmentWaitlistServic
         if (expired != 1) {
             return false;
         }
-        logAfterCommit(() -> log.info(
+        runAfterCommit(() -> log.info(
                 "Waitlist status changed: waitlistId={}, patientId={}, slotId={}, oldStatus={}, newStatus={}, offerExpireTime={}",
                 candidate.getId(), candidate.getPatientId(), candidate.getScheduleSlotId(),
                 WAITLIST_STATUS_OFFERED, WAITLIST_STATUS_EXPIRED, candidate.getOfferExpireTime()));
         if (offerFirstWaiting(candidate.getScheduleSlotId())) {
-            logAfterCommit(() -> log.info(
+            runAfterCommit(() -> log.info(
                     "Expired waitlist offer assigned to next patient: waitlistId={}, patientId={}, slotId={}",
                     candidate.getId(), candidate.getPatientId(), candidate.getScheduleSlotId()));
         } else {
             releaseToPublicStock(candidate.getScheduleSlotId());
-            logAfterCommit(() -> log.info(
+            runAfterCommit(() -> log.info(
                     "No waiting patient; capacity restored to public stock: waitlistId={}, patientId={}, slotId={}",
                     candidate.getId(), candidate.getPatientId(), candidate.getScheduleSlotId()));
         }
+        return true;
+    }
+
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public boolean expireWaiting(Long waitlistId) {
+        AppointmentWaitlist candidate = appointmentWaitlistMapper.selectById(waitlistId);
+        if (candidate == null) {
+            return false;
+        }
+        int expired = appointmentWaitlistMapper.expireWaitingIfSlotEnded(waitlistId, LocalDateTime.now());
+        if (expired != 1) {
+            return false;
+        }
+        runAfterCommit(() -> log.info(
+                "Waitlist status changed after schedule ended: waitlistId={}, patientId={}, slotId={}, oldStatus={}, newStatus={}, offerExpireTime={}",
+                candidate.getId(), candidate.getPatientId(), candidate.getScheduleSlotId(),
+                WAITLIST_STATUS_WAITING, WAITLIST_STATUS_EXPIRED, candidate.getOfferExpireTime()));
         return true;
     }
 
@@ -253,6 +286,16 @@ public class AppointmentWaitlistServiceImpl implements AppointmentWaitlistServic
     private void releaseToPublicStock(Long scheduleSlotId) {
         if (doctorScheduleSlotMapper.increaseRemainingCapacity(scheduleSlotId) != 1) {
             throw new BusinessException(ErrorCode.CONFLICT);
+        }
+        DoctorScheduleSlot slot = doctorScheduleSlotMapper.findById(scheduleSlotId);
+        if (slot == null) {
+            throw new BusinessException(ErrorCode.NOT_FOUND);
+        }
+        if (!SCHEDULE_STATUS_OPEN.equals(slot.getStatus()) || hasEnded(slot, LocalDateTime.now())) {
+            // Closed/ended slots must not regain a Redis key. MySQL capacity is still restored so
+            // total - remaining continues to represent the number of active reservations.
+            runAfterCommit(() -> appointmentStockService.remove(scheduleSlotId));
+            return;
         }
         appointmentStockService.restore(scheduleSlotId);
         if (!TransactionSynchronizationManager.isSynchronizationActive()) {
@@ -281,15 +324,15 @@ public class AppointmentWaitlistServiceImpl implements AppointmentWaitlistServic
         return patient.getId();
     }
 
-    private void logAfterCommit(Runnable loggingAction) {
+    private void runAfterCommit(Runnable action) {
         if (!TransactionSynchronizationManager.isSynchronizationActive()) {
-            loggingAction.run();
+            action.run();
             return;
         }
         TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
             @Override
             public void afterCommit() {
-                loggingAction.run();
+                action.run();
             }
         });
     }
@@ -299,13 +342,16 @@ public class AppointmentWaitlistServiceImpl implements AppointmentWaitlistServic
             throw new BusinessException(ErrorCode.NOT_FOUND);
         }
         LocalDateTime now = LocalDateTime.now();
-        boolean alreadyEnded = slot.getScheduleDate().isBefore(now.toLocalDate())
-                || (slot.getScheduleDate().equals(now.toLocalDate())
-                && !slot.getEndTime().isAfter(now.toLocalTime()));
         if (!SCHEDULE_STATUS_OPEN.equals(slot.getStatus())
                 || !Integer.valueOf(0).equals(slot.getRemainingCapacity())
-                || alreadyEnded) {
+                || hasEnded(slot, now)) {
             throw new BusinessException(ErrorCode.CONFLICT);
         }
+    }
+
+    private boolean hasEnded(DoctorScheduleSlot slot, LocalDateTime now) {
+        return slot.getScheduleDate().isBefore(now.toLocalDate())
+                || (slot.getScheduleDate().equals(now.toLocalDate())
+                && !slot.getEndTime().isAfter(now.toLocalTime()));
     }
 }

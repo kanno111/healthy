@@ -20,6 +20,7 @@ import org.springframework.transaction.support.TransactionSynchronization;
 import org.springframework.transaction.support.TransactionSynchronizationManager;
 
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.util.Locale;
 import java.util.Set;
 
@@ -57,7 +58,9 @@ public class DoctorAppointmentServiceImpl implements DoctorAppointmentService {
     public void complete(Long userId, Long appointmentId) {
         try {
             Doctor doctor = requireCurrentDoctor(userId);
-            int affectedRows = appointmentMapper.completeBookedByDoctor(appointmentId, doctor.getId());
+            LocalDateTime now = LocalDateTime.now();
+            int affectedRows = appointmentMapper.completeBookedByDoctor(
+                    appointmentId, doctor.getId(), now.toLocalDate(), now.toLocalTime());
             if (affectedRows == 1) {
                 logAfterCommit(() -> log.info(
                         "Doctor completed appointment successfully: appointmentId={}, doctorId={}, oldStatus=BOOKED, newStatus=COMPLETED",

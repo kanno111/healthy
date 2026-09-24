@@ -132,6 +132,23 @@ class ScheduleSlotServiceImplTest {
         verify(appointmentStockService, never()).initializeIfAbsent(anyLong(), anyInt());
     }
 
+    @Test
+    void updateStatusRejectsReopeningEndedSlot() {
+        ScheduleSlotService service = new ScheduleSlotServiceImpl(
+                doctorService, doctorScheduleSlotMapper, appointmentStockService);
+        DoctorScheduleSlot endedSlot = slot(10L, 2, 3);
+        endedSlot.setScheduleDate(LocalDate.now().minusDays(1));
+        endedSlot.setEndTime(LocalTime.of(12, 0));
+        endedSlot.setStatus("CLOSED");
+        when(doctorScheduleSlotMapper.findById(10L)).thenReturn(endedSlot);
+
+        assertThatThrownBy(() -> service.updateStatus(10L, "OPEN"))
+                .isInstanceOf(BusinessException.class);
+
+        verify(doctorScheduleSlotMapper, never()).updateStatus(anyLong(), any(), anyInt());
+        verify(appointmentStockService, never()).initialize(anyLong(), anyInt());
+    }
+
     private ScheduleBatchDTO request(LocalDate date, LocalTime startTime, LocalTime endTime) {
         ScheduleBatchDTO request = new ScheduleBatchDTO();
         request.setDoctorId(1L);

@@ -9,12 +9,21 @@ import com.healthy.appointment.vo.AdminAppointmentWaitlistVO;
 import com.healthy.appointment.vo.PatientAppointmentWaitlistVO;
 import org.apache.ibatis.annotations.Param;
 
-import java.util.List;
 import java.time.LocalDate;
+import java.time.LocalDateTime;
+import java.util.List;
 
 public interface AppointmentWaitlistMapper extends BaseMapper<AppointmentWaitlist> {
 
     AppointmentWaitlist selectFirstWaitingForUpdate(@Param("scheduleSlotId") Long scheduleSlotId);
+
+    List<AppointmentWaitlist> selectExpiredWaiting(
+            @Param("now") LocalDateTime now,
+            @Param("limit") int limit);
+
+    int expireWaitingIfSlotEnded(
+            @Param("waitlistId") Long waitlistId,
+            @Param("now") LocalDateTime now);
 
     List<PatientAppointmentWaitlistVO> listByPatientId(@Param("patientId") Long patientId);
 

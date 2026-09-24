@@ -89,6 +89,8 @@
         WHERE id = #{id}
           AND doctor_id = #{doctorId}
           AND status = 'BOOKED'
+          AND (schedule_date &lt; #{currentDate}
+               OR (schedule_date = #{currentDate} AND start_time &lt;= #{currentTime}))
     </update>
 
     <select id="listForAdmin" resultType="com.healthy.appointment.vo.AdminAppointmentVO">

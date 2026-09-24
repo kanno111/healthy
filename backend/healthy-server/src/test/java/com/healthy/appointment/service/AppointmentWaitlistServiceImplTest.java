@@ -62,7 +62,7 @@ class AppointmentWaitlistServiceImplTest {
         AppointmentWaitlist saved = waitlist(20L);
 
         when(patientMapper.selectOne(any())).thenReturn(enabledPatient(5L));
-        when(doctorScheduleSlotMapper.findById(10L)).thenReturn(fullOpenFutureSlot(10L));
+        when(doctorScheduleSlotMapper.findByIdForUpdate(10L)).thenReturn(fullOpenFutureSlot(10L));
         when(appointmentWaitlistMapper.selectOne(any())).thenReturn(null, saved);
         when(appointmentWaitlistMapper.findByIdAndPatientId(20L, 5L)).thenReturn(waitlistVO(20L));
         when(appointmentWaitlistMapper.insert(any(AppointmentWaitlist.class))).thenAnswer(invocation -> {
@@ -80,6 +80,7 @@ class AppointmentWaitlistServiceImplTest {
         assertThat(captor.getValue().getScheduleSlotId()).isEqualTo(10L);
         assertThat(captor.getValue().getStatus()).isEqualTo(WAITLIST_STATUS_WAITING);
         assertThat(captor.getValue().getOfferExpireTime()).isNull();
+        verify(doctorScheduleSlotMapper).findByIdForUpdate(10L);
     }
 
     @Test
@@ -88,7 +89,7 @@ class AppointmentWaitlistServiceImplTest {
         AppointmentWaitlist existing = waitlist(20L);
 
         when(patientMapper.selectOne(any())).thenReturn(enabledPatient(5L));
-        when(doctorScheduleSlotMapper.findById(10L)).thenReturn(fullOpenFutureSlot(10L));
+        when(doctorScheduleSlotMapper.findByIdForUpdate(10L)).thenReturn(fullOpenFutureSlot(10L));
         when(appointmentWaitlistMapper.selectOne(any())).thenReturn(existing);
         when(appointmentWaitlistMapper.findByIdAndPatientId(20L, 5L)).thenReturn(waitlistVO(20L));
 
@@ -103,7 +104,7 @@ class AppointmentWaitlistServiceImplTest {
         AppointmentWaitlist existing = waitlist(20L);
 
         when(patientMapper.selectOne(any())).thenReturn(enabledPatient(5L));
-        when(doctorScheduleSlotMapper.findById(10L)).thenReturn(fullOpenFutureSlot(10L));
+        when(doctorScheduleSlotMapper.findByIdForUpdate(10L)).thenReturn(fullOpenFutureSlot(10L));
         when(appointmentWaitlistMapper.selectOne(any())).thenReturn(null, existing);
         when(appointmentWaitlistMapper.findByIdAndPatientId(20L, 5L)).thenReturn(waitlistVO(20L));
         when(appointmentWaitlistMapper.insert(any(AppointmentWaitlist.class))).thenThrow(new DuplicateKeyException("active waitlist exists"));
@@ -117,7 +118,7 @@ class AppointmentWaitlistServiceImplTest {
         DoctorScheduleSlot slot = fullOpenFutureSlot(10L);
         slot.setRemainingCapacity(1);
         when(patientMapper.selectOne(any())).thenReturn(enabledPatient(5L));
-        when(doctorScheduleSlotMapper.findById(10L)).thenReturn(slot);
+        when(doctorScheduleSlotMapper.findByIdForUpdate(10L)).thenReturn(slot);
 
         assertThatThrownBy(() -> service.join(1L, request(10L))).isInstanceOf(BusinessException.class);
 
@@ -128,7 +129,7 @@ class AppointmentWaitlistServiceImplTest {
     void joinRejectsPatientWithBookedAppointmentForTheSameSlot() {
         AppointmentWaitlistService service = createService();
         when(patientMapper.selectOne(any())).thenReturn(enabledPatient(5L));
-        when(doctorScheduleSlotMapper.findById(10L)).thenReturn(fullOpenFutureSlot(10L));
+        when(doctorScheduleSlotMapper.findByIdForUpdate(10L)).thenReturn(fullOpenFutureSlot(10L));
         when(appointmentMapper.findActiveByPatientIdAndScheduleSlotId(5L, 10L))
                 .thenReturn(new com.healthy.appointment.vo.PatientAppointmentVO());
 
@@ -177,6 +178,33 @@ class AppointmentWaitlistServiceImplTest {
     }
 
     @Test
+    void offerFirstWaitingDoesNotOfferAfterScheduleEnded() {
+        AppointmentWaitlistService service = createService();
+        DoctorScheduleSlot endedSlot = fullOpenFutureSlot(10L);
+        endedSlot.setScheduleDate(LocalDate.now().minusDays(1));
+        when(doctorScheduleSlotMapper.findByIdForUpdate(10L)).thenReturn(endedSlot);
+
+        assertThat(service.offerFirstWaiting(10L)).isFalse();
+
+        verify(appointmentWaitlistMapper, never()).selectFirstWaitingForUpdate(10L);
+        verify(appointmentWaitlistMapper, never()).update(org.mockito.ArgumentMatchers.isNull(), any());
+        verify(waitlistTimeoutMessagePublisher, never()).publishAfterCommit(any(), any());
+    }
+
+    @Test
+    void offerFirstWaitingDoesNotOfferWhenScheduleIsClosed() {
+        AppointmentWaitlistService service = createService();
+        DoctorScheduleSlot closedSlot = fullOpenFutureSlot(10L);
+        closedSlot.setStatus("CLOSED");
+        when(doctorScheduleSlotMapper.findByIdForUpdate(10L)).thenReturn(closedSlot);
+
+        assertThat(service.offerFirstWaiting(10L)).isFalse();
+
+        verify(appointmentWaitlistMapper, never()).selectFirstWaitingForUpdate(10L);
+        verify(waitlistTimeoutMessagePublisher, never()).publishAfterCommit(any(), any());
+    }
+
+    @Test
     void confirmCreatesAppointmentWithoutDeductingPublicStock() {
         AppointmentWaitlistService service = createService();
         AppointmentWaitlist offered = waitlist(20L);
@@ -215,6 +243,44 @@ class AppointmentWaitlistServiceImplTest {
     }
 
     @Test
+    void confirmRejectsOfferAfterScheduleEnded() {
+        AppointmentWaitlistService service = createService();
+        AppointmentWaitlist offered = waitlist(20L);
+        offered.setStatus(WAITLIST_STATUS_OFFERED);
+        offered.setOfferExpireTime(LocalDateTime.now().plusMinutes(5));
+        DoctorScheduleSlot endedSlot = fullOpenFutureSlot(10L);
+        endedSlot.setScheduleDate(LocalDate.now().minusDays(1));
+        when(patientMapper.selectOne(any())).thenReturn(enabledPatient(5L));
+        when(appointmentWaitlistMapper.selectOne(any())).thenReturn(offered);
+        when(appointmentMapper.findActiveByPatientIdAndScheduleSlotId(5L, 10L)).thenReturn(null);
+        when(doctorScheduleSlotMapper.findById(10L)).thenReturn(endedSlot);
+
+        assertThatThrownBy(() -> service.confirm(1L, 20L)).isInstanceOf(BusinessException.class);
+
+        verify(appointmentWaitlistMapper, never()).update(org.mockito.ArgumentMatchers.isNull(), any());
+        verify(appointmentMapper, never()).insert(any(Appointment.class));
+    }
+
+    @Test
+    void confirmRejectsOfferWhenScheduleIsClosed() {
+        AppointmentWaitlistService service = createService();
+        AppointmentWaitlist offered = waitlist(20L);
+        offered.setStatus(WAITLIST_STATUS_OFFERED);
+        offered.setOfferExpireTime(LocalDateTime.now().plusMinutes(5));
+        DoctorScheduleSlot closedSlot = fullOpenFutureSlot(10L);
+        closedSlot.setStatus("CLOSED");
+        when(patientMapper.selectOne(any())).thenReturn(enabledPatient(5L));
+        when(appointmentWaitlistMapper.selectOne(any())).thenReturn(offered);
+        when(appointmentMapper.findActiveByPatientIdAndScheduleSlotId(5L, 10L)).thenReturn(null);
+        when(doctorScheduleSlotMapper.findById(10L)).thenReturn(closedSlot);
+
+        assertThatThrownBy(() -> service.confirm(1L, 20L)).isInstanceOf(BusinessException.class);
+
+        verify(appointmentWaitlistMapper, never()).update(org.mockito.ArgumentMatchers.isNull(), any());
+        verify(appointmentMapper, never()).insert(any(Appointment.class));
+    }
+
+    @Test
     void expireOfferAdvancesToNextWaitingPatientWithoutRestoringPublicStock() {
         AppointmentWaitlistService service = createService();
         AppointmentWaitlist expiredOffer = waitlist(20L);
@@ -243,11 +309,33 @@ class AppointmentWaitlistServiceImplTest {
         when(doctorScheduleSlotMapper.findByIdForUpdate(10L)).thenReturn(fullOpenFutureSlot(10L));
         when(appointmentWaitlistMapper.selectFirstWaitingForUpdate(10L)).thenReturn(null);
         when(doctorScheduleSlotMapper.increaseRemainingCapacity(10L)).thenReturn(1);
+        when(doctorScheduleSlotMapper.findById(10L)).thenReturn(fullOpenFutureSlot(10L));
 
         assertThat(service.expireOffered(20L)).isTrue();
 
         verify(doctorScheduleSlotMapper).increaseRemainingCapacity(10L);
         verify(appointmentStockService).restore(10L);
+    }
+
+    @Test
+    void expireOfferAfterScheduleEndedRestoresOnlyMysqlAndRemovesRedisKey() {
+        AppointmentWaitlistService service = createService();
+        AppointmentWaitlist expiredOffer = waitlist(20L);
+        expiredOffer.setStatus(WAITLIST_STATUS_OFFERED);
+        expiredOffer.setOfferExpireTime(LocalDateTime.now().minusMinutes(1));
+        DoctorScheduleSlot endedSlot = fullOpenFutureSlot(10L);
+        endedSlot.setScheduleDate(LocalDate.now().minusDays(1));
+        when(appointmentWaitlistMapper.selectById(20L)).thenReturn(expiredOffer);
+        when(appointmentWaitlistMapper.update(org.mockito.ArgumentMatchers.isNull(), any())).thenReturn(1);
+        when(doctorScheduleSlotMapper.findByIdForUpdate(10L)).thenReturn(endedSlot);
+        when(doctorScheduleSlotMapper.increaseRemainingCapacity(10L)).thenReturn(1);
+        when(doctorScheduleSlotMapper.findById(10L)).thenReturn(endedSlot);
+
+        assertThat(service.expireOffered(20L)).isTrue();
+
+        verify(doctorScheduleSlotMapper).increaseRemainingCapacity(10L);
+        verify(appointmentStockService).remove(10L);
+        verify(appointmentStockService, never()).restore(10L);
     }
 
     @Test
@@ -263,6 +351,34 @@ class AppointmentWaitlistServiceImplTest {
 
         verify(appointmentWaitlistMapper, never()).selectFirstWaitingForUpdate(10L);
         verify(doctorScheduleSlotMapper, never()).increaseRemainingCapacity(10L);
+        verify(appointmentStockService, never()).restore(10L);
+    }
+
+    @Test
+    void expireWaitingAfterScheduleEndedDoesNotTouchStock() {
+        AppointmentWaitlistService service = createService();
+        AppointmentWaitlist waiting = waitlist(20L);
+        when(appointmentWaitlistMapper.selectById(20L)).thenReturn(waiting);
+        when(appointmentWaitlistMapper.expireWaitingIfSlotEnded(
+                org.mockito.ArgumentMatchers.eq(20L), any(LocalDateTime.class))).thenReturn(1);
+
+        assertThat(service.expireWaiting(20L)).isTrue();
+
+        verify(appointmentWaitlistMapper).expireWaitingIfSlotEnded(
+                org.mockito.ArgumentMatchers.eq(20L), any(LocalDateTime.class));
+        verify(doctorScheduleSlotMapper, never()).increaseRemainingCapacity(10L);
+        verify(appointmentStockService, never()).restore(10L);
+    }
+
+    @Test
+    void expireWaitingTreatsAffectedRowsZeroAsIdempotentSkip() {
+        AppointmentWaitlistService service = createService();
+        when(appointmentWaitlistMapper.selectById(20L)).thenReturn(waitlist(20L));
+        when(appointmentWaitlistMapper.expireWaitingIfSlotEnded(
+                org.mockito.ArgumentMatchers.eq(20L), any(LocalDateTime.class))).thenReturn(0);
+
+        assertThat(service.expireWaiting(20L)).isFalse();
+
         verify(appointmentStockService, never()).restore(10L);
     }
 

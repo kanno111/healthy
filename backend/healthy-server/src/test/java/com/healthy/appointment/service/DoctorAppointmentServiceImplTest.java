@@ -15,6 +15,7 @@ import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 
 import java.time.LocalDate;
+import java.time.LocalTime;
 import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -64,18 +65,21 @@ class DoctorAppointmentServiceImplTest {
     @Test
     void completesOnlyBookedAppointmentOwnedByCurrentDoctor() {
         when(doctorMapper.findEnabledByUserId(100L)).thenReturn(doctor(8L, 100L));
-        when(appointmentMapper.completeBookedByDoctor(20L, 8L)).thenReturn(1);
+        when(appointmentMapper.completeBookedByDoctor(
+                eq(20L), eq(8L), any(LocalDate.class), any(LocalTime.class))).thenReturn(1);
 
         service.complete(100L, 20L);
 
-        verify(appointmentMapper).completeBookedByDoctor(20L, 8L);
+        verify(appointmentMapper).completeBookedByDoctor(
+                eq(20L), eq(8L), any(LocalDate.class), any(LocalTime.class));
         verify(appointmentMapper, never()).findById(20L);
     }
 
     @Test
     void rejectsAppointmentOwnedByAnotherDoctorWhenConditionalUpdateAffectsNoRows() {
         when(doctorMapper.findEnabledByUserId(100L)).thenReturn(doctor(8L, 100L));
-        when(appointmentMapper.completeBookedByDoctor(20L, 8L)).thenReturn(0);
+        when(appointmentMapper.completeBookedByDoctor(
+                eq(20L), eq(8L), any(LocalDate.class), any(LocalTime.class))).thenReturn(0);
         Appointment appointment = new Appointment();
         appointment.setId(20L);
         appointment.setDoctorId(9L);
@@ -89,7 +93,8 @@ class DoctorAppointmentServiceImplTest {
     @Test
     void rejectsRepeatedCompletionWhenConditionalUpdateAffectsNoRows() {
         when(doctorMapper.findEnabledByUserId(100L)).thenReturn(doctor(8L, 100L));
-        when(appointmentMapper.completeBookedByDoctor(20L, 8L)).thenReturn(0);
+        when(appointmentMapper.completeBookedByDoctor(
+                eq(20L), eq(8L), any(LocalDate.class), any(LocalTime.class))).thenReturn(0);
         Appointment appointment = new Appointment();
         appointment.setId(20L);
         appointment.setDoctorId(8L);
@@ -99,7 +104,26 @@ class DoctorAppointmentServiceImplTest {
         assertThatThrownBy(() -> service.complete(100L, 20L))
                 .isInstanceOf(BusinessException.class);
 
-        verify(appointmentMapper).completeBookedByDoctor(20L, 8L);
+        verify(appointmentMapper).completeBookedByDoctor(
+                eq(20L), eq(8L), any(LocalDate.class), any(LocalTime.class));
+    }
+
+    @Test
+    void rejectsCompletingFutureAppointment() {
+        when(doctorMapper.findEnabledByUserId(100L)).thenReturn(doctor(8L, 100L));
+        Appointment appointment = new Appointment();
+        appointment.setId(20L);
+        appointment.setDoctorId(8L);
+        appointment.setStatus("BOOKED");
+        appointment.setScheduleDate(LocalDate.now().plusDays(1));
+        appointment.setStartTime(LocalTime.of(8, 0));
+        when(appointmentMapper.findById(20L)).thenReturn(appointment);
+
+        assertThatThrownBy(() -> service.complete(100L, 20L))
+                .isInstanceOf(BusinessException.class);
+
+        verify(appointmentMapper).completeBookedByDoctor(
+                eq(20L), eq(8L), any(LocalDate.class), any(LocalTime.class));
     }
 
     @Test

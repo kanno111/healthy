@@ -69,7 +69,8 @@
                next_queue_number, status, version, created_at, updated_at
         FROM doctor_schedule_slot
         WHERE status = 'OPEN'
-          AND schedule_date &gt;= CURRENT_DATE
+          AND (schedule_date &gt; CURRENT_DATE
+               OR (schedule_date = CURRENT_DATE AND end_time &gt; CURRENT_TIME))
     </select>
 
     <update id="decreaseRemainingCapacity">

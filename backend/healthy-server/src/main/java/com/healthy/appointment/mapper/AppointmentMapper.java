@@ -9,6 +9,7 @@ import org.apache.ibatis.annotations.Param;
 
 import java.util.List;
 import java.time.LocalDate;
+import java.time.LocalTime;
 
 public interface AppointmentMapper {
     int insert(@Param("appointment") Appointment appointment);
@@ -38,7 +39,11 @@ public interface AppointmentMapper {
             @Param("status") String status
     );
 
-    int completeBookedByDoctor(@Param("id") Long id, @Param("doctorId") Long doctorId);
+    int completeBookedByDoctor(
+            @Param("id") Long id,
+            @Param("doctorId") Long doctorId,
+            @Param("currentDate") LocalDate currentDate,
+            @Param("currentTime") LocalTime currentTime);
 
     List<AdminAppointmentVO> listForAdmin();
 
