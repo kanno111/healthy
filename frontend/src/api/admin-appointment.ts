@@ -16,6 +16,14 @@ export type AdminAppointment = {
   createdAt: string
 }
 
+export type AdminAppointmentPage = {
+  records: AdminAppointment[]
+  total: number
+  page: number
+  pageSize: number
+  totalPages: number
+}
+
 async function request<T>(url: string, token: string, options?: RequestInit): Promise<T> {
   const response = await fetch(url, {
     ...options,
@@ -27,7 +35,10 @@ async function request<T>(url: string, token: string, options?: RequestInit): Pr
 }
 
 export const adminAppointmentApi = {
-  list: (token: string) => request<AdminAppointment[]>('/api/admin/appointments', token),
+  page: (token: string, page: number, pageSize: number) => {
+    const params = new URLSearchParams({ page: String(page), pageSize: String(pageSize) })
+    return request<AdminAppointmentPage>(`/api/admin/appointments?${params}`, token)
+  },
   complete: (token: string, appointmentId: number) => request<null>(`/api/admin/appointments/${appointmentId}/complete`, token, {
     method: 'PATCH'
   })

@@ -1,6 +1,7 @@
 package com.healthy.appointment.service;
 
 import com.healthy.appointment.dto.AppointmentCreateDTO;
+import com.healthy.appointment.result.PageResult;
 import com.healthy.appointment.vo.AdminAppointmentVO;
 import com.healthy.appointment.vo.PatientAppointmentVO;
 
@@ -13,7 +14,7 @@ public interface AppointmentService {
 
     void complete(Long appointmentId);
 
-    List<AdminAppointmentVO> listForAdmin();
+    PageResult<AdminAppointmentVO> pageForAdmin(int page, int pageSize);
 
     List<PatientAppointmentVO> listMyAppointments(Long userId);
 }

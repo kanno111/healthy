@@ -45,7 +45,7 @@ public interface AppointmentMapper {
             @Param("currentDate") LocalDate currentDate,
             @Param("currentTime") LocalTime currentTime);
 
-    List<AdminAppointmentVO> listForAdmin();
+    IPage<AdminAppointmentVO> pageForAdmin(@Param("page") IPage<AdminAppointmentVO> page);
 
     PatientAppointmentVO findByIdAndPatientId(@Param("id") Long id, @Param("patientId") Long patientId);
 

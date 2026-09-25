@@ -50,6 +50,10 @@ const scheduleModalVisible = ref(false)
 const savingSchedule = ref(false)
 const selectedScheduleSlot = ref<ScheduleSlot | null>(null)
 const adminAppointments = ref<AdminAppointment[]>([])
+const appointmentPage = ref(1)
+const appointmentPageSize = ref(10)
+const appointmentTotal = ref(0)
+const appointmentTotalPages = ref(0)
 const loadingAppointments = ref(false)
 const appointmentError = ref('')
 const completingAppointmentId = ref<number | null>(null)
@@ -465,17 +469,31 @@ async function toggleDepartmentStatus(department: Department) {
   } catch (error) { departmentError.value = error instanceof ApiError ? error.message : '状态更新失败' }
 }
 
-async function loadAdminAppointments() {
+async function loadAdminAppointments(page = appointmentPage.value) {
   if (!session.token) return
   loadingAppointments.value = true
   appointmentError.value = ''
   try {
-    adminAppointments.value = await adminAppointmentApi.list(session.token)
+    const result = await adminAppointmentApi.page(session.token, page, appointmentPageSize.value)
+    adminAppointments.value = result.records
+    appointmentPage.value = result.page
+    appointmentTotal.value = result.total
+    appointmentTotalPages.value = result.totalPages
   } catch (error) {
     appointmentError.value = error instanceof ApiError ? error.message : '预约订单加载失败'
   } finally {
     loadingAppointments.value = false
   }
+}
+
+function changeAppointmentPage(page: number) {
+  if (page < 1 || page > appointmentTotalPages.value || page === appointmentPage.value) return
+  void loadAdminAppointments(page)
+}
+
+function changeAppointmentPageSize() {
+  appointmentPage.value = 1
+  void loadAdminAppointments(1)
 }
 
 function canCompleteAppointment(item: AdminAppointment) {
@@ -725,11 +743,12 @@ onBeforeUnmount(() => { if (waitlistCountdownTimer !== undefined) window.clearIn
         </template>
       </section>
       <section v-else-if="active === 'appointments'" class="resource-page">
-        <div class="resource-intro"><div><h2>预约订单</h2><p>查看患者预约记录；仅已到就诊开始时间且仍待就诊的订单可标记为完成。</p></div><button class="table-action" :disabled="loadingAppointments" @click="loadAdminAppointments">刷新</button></div>
+        <div class="resource-intro"><div><h2>预约订单</h2><p>查看患者预约记录；仅已到就诊开始时间且仍待就诊的订单可标记为完成。</p></div><button class="table-action" :disabled="loadingAppointments" @click="loadAdminAppointments()">刷新</button></div>
         <p v-if="appointmentError" class="resource-error">{{ appointmentError }}</p>
         <div v-if="loadingAppointments" class="resource-empty">正在加载预约订单…</div>
         <section v-else-if="adminAppointments.length" class="doctor-admin-table"><table><thead><tr><th>预约单号</th><th>患者</th><th>医生 / 科室</th><th>就诊时段</th><th>状态</th><th>操作</th></tr></thead><tbody><tr v-for="item in adminAppointments" :key="item.id"><td>{{ item.appointmentNo }}</td><td><b>{{ item.patientName }}</b></td><td>{{ item.doctorName }}<small class="appointment-department">{{ item.departmentName }}</small></td><td>{{ item.scheduleDate }} {{ item.startTime.slice(0, 5) }}-{{ item.endTime.slice(0, 5) }}<small class="appointment-department">{{ item.sessionName }}</small></td><td><span class="status" :class="item.status.toLowerCase()">{{ appointmentStatusText(item.status) }}</span></td><td><button v-if="canCompleteAppointment(item)" class="table-action" :disabled="completingAppointmentId !== null" @click="completeAppointment(item)">{{ completingAppointmentId === item.id ? '处理中…' : '确认完成' }}</button><span v-else class="appointment-action-hint">{{ item.status === 'BOOKED' ? '未到就诊时间' : '-' }}</span></td></tr></tbody></table></section>
         <div v-else class="resource-empty">暂无预约订单。</div>
+        <div v-if="appointmentTotal > 0" class="doctor-pagination"><label>每页<select v-model.number="appointmentPageSize" @change="changeAppointmentPageSize"><option :value="10">10 条</option><option :value="20">20 条</option><option :value="50">50 条</option></select></label><span>共 {{ appointmentTotal }} 条预约订单</span><div><button :disabled="appointmentPage === 1" @click="changeAppointmentPage(appointmentPage - 1)">上一页</button><b>第 {{ appointmentPage }} / {{ appointmentTotalPages }} 页</b><button :disabled="appointmentPage === appointmentTotalPages" @click="changeAppointmentPage(appointmentPage + 1)">下一页</button></div></div>
       </section>
       <section v-else-if="active === 'waitlist'" class="resource-page">
         <p class="waitlist-page-description">只读查看候补状态、真实 FIFO 顺序与已保留的候补资格；不支持人工调整队列。</p>

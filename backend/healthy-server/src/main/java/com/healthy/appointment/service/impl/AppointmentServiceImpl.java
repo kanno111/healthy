@@ -1,6 +1,8 @@
 package com.healthy.appointment.service.impl;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.baomidou.mybatisplus.core.metadata.IPage;
+import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.healthy.appointment.dto.AppointmentCreateDTO;
 import com.healthy.appointment.entity.Appointment;
 import com.healthy.appointment.entity.DoctorScheduleSlot;
@@ -10,6 +12,7 @@ import com.healthy.appointment.exception.BusinessException;
 import com.healthy.appointment.mapper.AppointmentMapper;
 import com.healthy.appointment.mapper.DoctorScheduleSlotMapper;
 import com.healthy.appointment.mapper.PatientMapper;
+import com.healthy.appointment.result.PageResult;
 import com.healthy.appointment.service.AppointmentService;
 import com.healthy.appointment.service.AppointmentStockService;
 import com.healthy.appointment.service.AppointmentStockRepairService;
@@ -165,8 +168,10 @@ public class AppointmentServiceImpl implements AppointmentService {
     }
 
     @Override
-    public List<AdminAppointmentVO> listForAdmin() {
-        return appointmentMapper.listForAdmin();
+    public PageResult<AdminAppointmentVO> pageForAdmin(int page, int pageSize) {
+        validatePage(page, pageSize);
+        IPage<AdminAppointmentVO> result = appointmentMapper.pageForAdmin(new Page<>(page, pageSize));
+        return PageResult.of(result.getRecords(), result.getTotal(), page, pageSize);
     }
 
     private Long findEnabledPatientId(Long userId) {
@@ -281,5 +286,11 @@ public class AppointmentServiceImpl implements AppointmentService {
         return appointment.getScheduleDate().isBefore(now.toLocalDate())
                 || (appointment.getScheduleDate().equals(now.toLocalDate())
                 && !appointment.getStartTime().isAfter(now.toLocalTime()));
+    }
+
+    private void validatePage(int page, int pageSize) {
+        if (page < 1 || pageSize < 1 || pageSize > 100) {
+            throw new BusinessException(ErrorCode.VALIDATION_ERROR);
+        }
     }
 }

@@ -1,6 +1,7 @@
 package com.healthy.appointment.service;
 
 import com.healthy.appointment.dto.AppointmentCreateDTO;
+import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.healthy.appointment.entity.Appointment;
 import com.healthy.appointment.entity.DoctorScheduleSlot;
 import com.healthy.appointment.entity.Patient;
@@ -8,7 +9,9 @@ import com.healthy.appointment.exception.BusinessException;
 import com.healthy.appointment.mapper.AppointmentMapper;
 import com.healthy.appointment.mapper.DoctorScheduleSlotMapper;
 import com.healthy.appointment.mapper.PatientMapper;
+import com.healthy.appointment.result.PageResult;
 import com.healthy.appointment.service.impl.AppointmentServiceImpl;
+import com.healthy.appointment.vo.AdminAppointmentVO;
 import com.healthy.appointment.vo.PatientAppointmentVO;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.BeforeAll;
@@ -21,6 +24,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.time.LocalDate;
 import java.time.LocalTime;
+import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -248,6 +252,34 @@ class AppointmentServiceImplTest {
 
         verify(doctorScheduleSlotMapper).increaseRemainingCapacity(10L);
         verify(appointmentStockService).restore(10L);
+    }
+
+    @Test
+    void pageForAdminReturnsMappedPageMetadata() {
+        AppointmentService service = createService();
+        AdminAppointmentVO appointment = new AdminAppointmentVO();
+        appointment.setId(20L);
+        Page<AdminAppointmentVO> mapperPage = new Page<>(2, 10, 23);
+        mapperPage.setRecords(List.of(appointment));
+        when(appointmentMapper.pageForAdmin(any())).thenReturn(mapperPage);
+
+        PageResult<AdminAppointmentVO> result = service.pageForAdmin(2, 10);
+
+        assertThat(result.records()).containsExactly(appointment);
+        assertThat(result.total()).isEqualTo(23);
+        assertThat(result.page()).isEqualTo(2);
+        assertThat(result.pageSize()).isEqualTo(10);
+        assertThat(result.totalPages()).isEqualTo(3);
+    }
+
+    @Test
+    void pageForAdminRejectsInvalidPageSizeBeforeQueryingDatabase() {
+        AppointmentService service = createService();
+
+        assertThatThrownBy(() -> service.pageForAdmin(1, 101))
+                .isInstanceOf(BusinessException.class);
+
+        verify(appointmentMapper, never()).pageForAdmin(any());
     }
 
     private AppointmentService createService() {

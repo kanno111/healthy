@@ -93,7 +93,7 @@
                OR (schedule_date = #{currentDate} AND start_time &lt;= #{currentTime}))
     </update>
 
-    <select id="listForAdmin" resultType="com.healthy.appointment.vo.AdminAppointmentVO">
+    <select id="pageForAdmin" resultType="com.healthy.appointment.vo.AdminAppointmentVO">
         SELECT appointment.id, appointment.appointment_no,
                patient.real_name AS patient_name,
                doctor.name AS doctor_name, department.name AS department_name,
