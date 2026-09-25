@@ -312,9 +312,18 @@ VALUES
      'BOOKED', NULL, NULL, NOW()),
     ('DEMO-APT-0007', 'demo-request-0007', @patient_li_id, @digestive_doctor_id,
      @digestive_tomorrow_slot, 2, @tomorrow, '08:00:00', '12:00:00', NULL,
-     'BOOKED', NULL, NULL, NOW())
+     'CANCELLED', DATE_SUB(NOW(), INTERVAL 30 MINUTE), '模拟候补释放号源', NOW())
 ON DUPLICATE KEY UPDATE
     appointment_no = VALUES(appointment_no);
+
+-- Older versions of this seed created two BOOKED appointments and an OFFERED waitlist
+-- for a two-capacity slot. The offer therefore had no reserved capacity behind it.
+UPDATE appointment
+SET status = 'CANCELLED',
+    cancelled_at = COALESCE(cancelled_at, DATE_SUB(NOW(), INTERVAL 30 MINUTE)),
+    cancel_reason = COALESCE(cancel_reason, '模拟候补释放号源')
+WHERE appointment_no = 'DEMO-APT-0007'
+  AND status = 'BOOKED';
 
 -- Additional daily appointments. The date in each identifier makes a new import on
 -- another day useful, while rerunning it on the same day remains idempotent.
@@ -371,7 +380,8 @@ VALUES
      '14:00:00', '17:00:00', NULL, 'BOOKED', NULL, NULL, NOW()),
     (CONCAT('DEMO-APT-', @demo_date_key, '-116'), CONCAT('demo-request-', @demo_date_key, '-116'),
      @patient_luo_id, @dermatology_doctor_id, @dermatology_tomorrow_slot, 4, @tomorrow,
-     '14:00:00', '17:00:00', NULL, 'BOOKED', NULL, NULL, NOW()),
+     '14:00:00', '17:00:00', NULL, 'CANCELLED', DATE_SUB(NOW(), INTERVAL 25 MINUTE),
+     '模拟候补释放号源', NOW()),
     (CONCAT('DEMO-APT-', @demo_date_key, '-117'), CONCAT('demo-request-', @demo_date_key, '-117'),
      @patient_chen_id, @ophthalmology_doctor_id, @ophthalmology_future_slot, 1, @day_after_tomorrow,
      '08:00:00', '12:00:00', NULL, 'BOOKED', NULL, NULL, NOW()),
@@ -389,17 +399,39 @@ VALUES
 ON DUPLICATE KEY UPDATE
     request_id = request_id;
 
+UPDATE appointment
+SET status = 'CANCELLED',
+    cancelled_at = COALESCE(cancelled_at, DATE_SUB(NOW(), INTERVAL 25 MINUTE)),
+    cancel_reason = COALESCE(cancel_reason, '模拟候补释放号源')
+WHERE BINARY appointment_no = BINARY CONCAT('DEMO-APT-', @demo_date_key, '-116')
+  AND status = 'BOOKED';
+
 INSERT INTO appointment_waitlist (
     patient_id, schedule_slot_id, status, offer_expire_time, created_at
 )
-VALUES
-    (@patient_zhao_id, @digestive_tomorrow_slot, 'WAITING', NULL, DATE_SUB(NOW(), INTERVAL 20 MINUTE)),
-    (@patient_wang_id, @digestive_tomorrow_slot, 'OFFERED', DATE_ADD(NOW(), INTERVAL 30 MINUTE), DATE_SUB(NOW(), INTERVAL 30 MINUTE)),
-    (@patient_demo_id, @dermatology_tomorrow_slot, 'WAITING', NULL, DATE_SUB(NOW(), INTERVAL 18 MINUTE)),
-    (@patient_li_id, @dermatology_tomorrow_slot, 'WAITING', NULL, DATE_SUB(NOW(), INTERVAL 12 MINUTE)),
-    (@patient_zhao_id, @dermatology_tomorrow_slot, 'OFFERED', DATE_ADD(NOW(), INTERVAL 25 MINUTE), DATE_SUB(NOW(), INTERVAL 25 MINUTE))
-ON DUPLICATE KEY UPDATE
-    patient_id = VALUES(patient_id);
+SELECT seed.patient_id, seed.schedule_slot_id, seed.status, seed.offer_expire_time, seed.created_at
+FROM (
+    SELECT @patient_zhao_id AS patient_id, @digestive_tomorrow_slot AS schedule_slot_id,
+           'WAITING' AS status, NULL AS offer_expire_time, DATE_SUB(NOW(), INTERVAL 20 MINUTE) AS created_at
+    UNION ALL
+    SELECT @patient_wang_id, @digestive_tomorrow_slot,
+           'OFFERED', DATE_ADD(NOW(), INTERVAL 30 MINUTE), DATE_SUB(NOW(), INTERVAL 30 MINUTE)
+    UNION ALL
+    SELECT @patient_demo_id, @dermatology_tomorrow_slot,
+           'WAITING', NULL, DATE_SUB(NOW(), INTERVAL 18 MINUTE)
+    UNION ALL
+    SELECT @patient_li_id, @dermatology_tomorrow_slot,
+           'WAITING', NULL, DATE_SUB(NOW(), INTERVAL 12 MINUTE)
+    UNION ALL
+    SELECT @patient_zhao_id, @dermatology_tomorrow_slot,
+           'OFFERED', DATE_ADD(NOW(), INTERVAL 25 MINUTE), DATE_SUB(NOW(), INTERVAL 25 MINUTE)
+) seed
+WHERE NOT EXISTS (
+    SELECT 1
+    FROM appointment_waitlist existing
+    WHERE existing.patient_id = seed.patient_id
+      AND existing.schedule_slot_id = seed.schedule_slot_id
+);
 
 INSERT INTO appointment_waitlist (
     patient_id, schedule_slot_id, status, offer_expire_time, created_at
@@ -434,5 +466,29 @@ WHERE NOT EXISTS (
       AND schedule_slot_id = @dermatology_tomorrow_slot
       AND status = 'EXPIRED'
 );
+
+-- Reconcile the MySQL stock of the demo slots after importing data. BOOKED and
+-- COMPLETED appointments consume capacity; an OFFERED waitlist reserves one capacity.
+-- Redis appointment stock keys must be evicted after rerunning this script so they can
+-- be lazily rebuilt from these corrected MySQL values.
+UPDATE doctor_schedule_slot slot
+SET slot.remaining_capacity = GREATEST(
+        0,
+        slot.total_capacity
+            - (SELECT COUNT(*)
+               FROM appointment booked
+               WHERE booked.schedule_slot_id = slot.id
+                 AND booked.status IN ('BOOKED', 'COMPLETED'))
+            - (SELECT COUNT(*)
+               FROM appointment_waitlist offered
+               WHERE offered.schedule_slot_id = slot.id
+                 AND offered.status = 'OFFERED')
+    )
+WHERE slot.doctor_id IN (
+    @cardio_doctor_id, @cardio_2_doctor_id, @digestive_doctor_id, @digestive_2_doctor_id,
+    @pediatrics_doctor_id, @respiratory_doctor_id, @neurology_doctor_id,
+    @orthopedics_doctor_id, @dermatology_doctor_id, @ophthalmology_doctor_id
+)
+  AND slot.schedule_date BETWEEN @today AND DATE_ADD(@today, INTERVAL 13 DAY);
 
 COMMIT;

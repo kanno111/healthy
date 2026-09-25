@@ -17,7 +17,27 @@ const submitting = ref(false)
 const errorMessage = ref('')
 const alreadyBooked = ref(false)
 const fee = 10
-const requestId = crypto.randomUUID()
+const requestId = createRequestId()
+
+function createRequestId() {
+  if (typeof globalThis.crypto?.randomUUID === 'function') {
+    return globalThis.crypto.randomUUID()
+  }
+
+  // randomUUID is unavailable on some browsers when the site is accessed over plain HTTP.
+  // The request id is an idempotency key, not a credential, so a timestamp plus random
+  // bytes is sufficient and keeps the confirmation page usable before HTTPS is enabled.
+  const randomBytes = new Uint8Array(12)
+  if (typeof globalThis.crypto?.getRandomValues === 'function') {
+    globalThis.crypto.getRandomValues(randomBytes)
+  } else {
+    for (let index = 0; index < randomBytes.length; index += 1) {
+      randomBytes[index] = Math.floor(Math.random() * 256)
+    }
+  }
+  const randomPart = Array.from(randomBytes, (value) => value.toString(16).padStart(2, '0')).join('')
+  return `web-${Date.now()}-${randomPart}`
+}
 
 function formatDate(date: Date) {
   const year = date.getFullYear()
