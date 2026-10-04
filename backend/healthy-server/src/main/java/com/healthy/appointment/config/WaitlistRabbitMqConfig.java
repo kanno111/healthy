@@ -13,10 +13,10 @@ import org.springframework.amqp.rabbit.connection.ConnectionFactory;
 import org.springframework.amqp.rabbit.core.RabbitTemplate;
 import org.springframework.amqp.rabbit.retry.MessageRecoverer;
 import org.springframework.amqp.rabbit.retry.RepublishMessageRecovererWithConfirms;
-import org.springframework.amqp.support.converter.Jackson2JsonMessageConverter;
+import org.springframework.amqp.support.converter.JacksonJsonMessageConverter;
 import org.springframework.amqp.support.converter.MessageConverter;
-import org.springframework.boot.autoconfigure.amqp.RabbitProperties;
-import org.springframework.boot.autoconfigure.amqp.SimpleRabbitListenerContainerFactoryConfigurer;
+import org.springframework.boot.amqp.autoconfigure.RabbitProperties;
+import org.springframework.boot.amqp.autoconfigure.SimpleRabbitListenerContainerFactoryConfigurer;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import lombok.extern.slf4j.Slf4j;
@@ -123,7 +123,7 @@ public class WaitlistRabbitMqConfig {
                     "Waitlist timeout message parked after retry exhaustion", true, cause);
         };
         factory.setAdviceChain(RetryInterceptorBuilder.stateless()
-                .maxAttempts(retry.getMaxAttempts())
+                .maxRetries(Math.toIntExact(retry.getMaxRetries()))
                 .backOffOptions(retry.getInitialInterval().toMillis(), retry.getMultiplier(),
                         retry.getMaxInterval().toMillis())
                 .recoverer(parkingRecoverer)
@@ -133,6 +133,6 @@ public class WaitlistRabbitMqConfig {
 
     @Bean
     public MessageConverter messageConverter() {
-        return new Jackson2JsonMessageConverter();
+        return new JacksonJsonMessageConverter();
     }
 }

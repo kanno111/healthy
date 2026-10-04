@@ -7,6 +7,7 @@ import com.healthy.appointment.mapper.DepartmentMapper;
 import com.healthy.appointment.service.impl.DepartmentServiceImpl;
 import com.healthy.appointment.vo.DepartmentVO;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
@@ -24,6 +25,11 @@ import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
 class DepartmentServiceImplTest {
+    @BeforeAll
+    static void initializeMybatisPlusMetadata() {
+        MybatisPlusTestHelper.initializeTableInfo(Department.class);
+    }
+
     @Mock
     private DepartmentMapper departmentMapper;
 

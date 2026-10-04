@@ -175,7 +175,7 @@ public class AppointmentServiceImpl implements AppointmentService {
     }
 
     private Long findEnabledPatientId(Long userId) {
-        Patient patient = patientMapper.selectOne(new LambdaQueryWrapper<Patient>()
+        Patient patient = patientMapper.selectOne(new LambdaQueryWrapper<>(Patient.class)
                 .select(Patient::getId)
                 .eq(Patient::getUserId, userId)
                 .eq(Patient::getStatus, 1)

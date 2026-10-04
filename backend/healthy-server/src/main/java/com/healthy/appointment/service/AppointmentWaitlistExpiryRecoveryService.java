@@ -33,7 +33,7 @@ public class AppointmentWaitlistExpiryRecoveryService {
         int batchSize = Math.max(1,
                 Math.min(appointmentWaitlistProperties.getRecoveryBatchSize(), MAX_BATCH_SIZE));
         List<AppointmentWaitlist> candidates = appointmentWaitlistMapper.selectList(
-                new LambdaQueryWrapper<AppointmentWaitlist>()
+                new LambdaQueryWrapper<>(AppointmentWaitlist.class)
                         .eq(AppointmentWaitlist::getStatus, WAITLIST_STATUS_OFFERED)
                         .le(AppointmentWaitlist::getOfferExpireTime, LocalDateTime.now())
                         .orderByAsc(AppointmentWaitlist::getOfferExpireTime)

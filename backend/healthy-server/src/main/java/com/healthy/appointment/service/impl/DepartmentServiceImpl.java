@@ -2,7 +2,7 @@ package com.healthy.appointment.service.impl;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
-import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
+import com.baomidou.mybatisplus.spring.service.impl.ServiceImpl;
 import com.healthy.appointment.dto.DepartmentSaveDTO;
 import com.healthy.appointment.entity.Department;
 import com.healthy.appointment.enumeration.ErrorCode;
@@ -41,7 +41,7 @@ public class DepartmentServiceImpl extends ServiceImpl<DepartmentMapper, Departm
     @Override
     public Long create(DepartmentSaveDTO departmentSaveDTO) {
         Department department = toDepartment(departmentSaveDTO);
-        if (departmentMapper.exists(new LambdaQueryWrapper<Department>().eq(Department::getName, department.getName()))) {
+        if (departmentMapper.exists(new LambdaQueryWrapper<>(Department.class).eq(Department::getName, department.getName()))) {
             throw new BusinessException(ErrorCode.CONFLICT);
         }
         department.setStatus(1);
@@ -54,7 +54,7 @@ public class DepartmentServiceImpl extends ServiceImpl<DepartmentMapper, Departm
         getById(id);
         Department department = toDepartment(departmentSaveDTO);
         department.setId(id);
-        if (departmentMapper.exists(new LambdaQueryWrapper<Department>()
+        if (departmentMapper.exists(new LambdaQueryWrapper<>(Department.class)
                 .eq(Department::getName, department.getName()).ne(Department::getId, id))) {
             throw new BusinessException(ErrorCode.CONFLICT);
         }
@@ -65,7 +65,7 @@ public class DepartmentServiceImpl extends ServiceImpl<DepartmentMapper, Departm
     public void updateStatus(Long id, Integer status) {
         validateStatus(status);
         getById(id);
-        departmentMapper.update(null, new LambdaUpdateWrapper<Department>()
+        departmentMapper.update(null, new LambdaUpdateWrapper<>(Department.class)
                 .eq(Department::getId, id).set(Department::getStatus, status));
     }
 

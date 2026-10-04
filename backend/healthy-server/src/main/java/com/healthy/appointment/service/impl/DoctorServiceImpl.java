@@ -4,7 +4,7 @@ import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
-import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
+import com.baomidou.mybatisplus.spring.service.impl.ServiceImpl;
 import com.healthy.appointment.dto.DoctorSaveDTO;
 import com.healthy.appointment.entity.Doctor;
 import com.healthy.appointment.enumeration.ErrorCode;
@@ -90,7 +90,7 @@ public class DoctorServiceImpl extends ServiceImpl<DoctorMapper, Doctor> impleme
     public Long create(DoctorSaveDTO doctorSaveDTO) {
         Doctor doctor = toDoctor(doctorSaveDTO);
         validateEnabledDepartment(doctor.getDepartmentId());
-        if (doctorMapper.exists(new LambdaQueryWrapper<Doctor>().eq(Doctor::getDoctorCode, doctor.getDoctorCode()))) {
+        if (doctorMapper.exists(new LambdaQueryWrapper<>(Doctor.class).eq(Doctor::getDoctorCode, doctor.getDoctorCode()))) {
             throw new BusinessException(ErrorCode.CONFLICT);
         }
         doctor.setStatus(1);
@@ -104,7 +104,7 @@ public class DoctorServiceImpl extends ServiceImpl<DoctorMapper, Doctor> impleme
         Doctor doctor = toDoctor(doctorSaveDTO);
         doctor.setId(id);
         validateEnabledDepartment(doctor.getDepartmentId());
-        if (doctorMapper.exists(new LambdaQueryWrapper<Doctor>()
+        if (doctorMapper.exists(new LambdaQueryWrapper<>(Doctor.class)
                 .eq(Doctor::getDoctorCode, doctor.getDoctorCode()).ne(Doctor::getId, id))) {
             throw new BusinessException(ErrorCode.CONFLICT);
         }
@@ -115,7 +115,7 @@ public class DoctorServiceImpl extends ServiceImpl<DoctorMapper, Doctor> impleme
     public void updateStatus(Long id, Integer status) {
         validateStatus(status);
         getById(id);
-        doctorMapper.update(null, new LambdaUpdateWrapper<Doctor>()
+        doctorMapper.update(null, new LambdaUpdateWrapper<>(Doctor.class)
                 .eq(Doctor::getId, id).set(Doctor::getStatus, status));
     }
 

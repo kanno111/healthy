@@ -1,0 +1,26 @@
+CREATE TABLE message_outbox (
+    id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT COMMENT 'primary key',
+    event_id VARCHAR(64) NOT NULL COMMENT 'stable logical message id',
+    aggregate_type VARCHAR(50) NOT NULL COMMENT 'business aggregate type',
+    aggregate_id BIGINT UNSIGNED NOT NULL COMMENT 'business aggregate id',
+    event_type VARCHAR(100) NOT NULL COMMENT 'integration event or command type',
+    payload JSON NOT NULL COMMENT 'serialized message payload',
+    exchange_name VARCHAR(255) NOT NULL COMMENT 'target RabbitMQ exchange',
+    routing_key VARCHAR(255) NOT NULL COMMENT 'target RabbitMQ routing key',
+    scheduled_at DATETIME(3) NOT NULL COMMENT 'absolute business execution deadline',
+    status VARCHAR(20) NOT NULL DEFAULT 'PENDING' COMMENT 'PENDING, PROCESSING, RETRY, SENT, DEAD',
+    attempt_count INT UNSIGNED NOT NULL DEFAULT 0 COMMENT 'number of publish attempts',
+    next_retry_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3) COMMENT 'earliest next dispatch time',
+    processing_started_at DATETIME(3) DEFAULT NULL COMMENT 'start time of the active publish attempt',
+    last_error VARCHAR(1000) DEFAULT NULL COMMENT 'last publish failure',
+    sent_at DATETIME(3) DEFAULT NULL COMMENT 'broker confirm time',
+    created_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3) COMMENT 'created time',
+    updated_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3) ON UPDATE CURRENT_TIMESTAMP(3) COMMENT 'updated time',
+    PRIMARY KEY (id),
+    UNIQUE KEY uk_message_outbox_event_id (event_id),
+    KEY idx_message_outbox_dispatch (status, next_retry_at, id),
+    KEY idx_message_outbox_processing (status, processing_started_at, id),
+    KEY idx_message_outbox_aggregate (aggregate_type, aggregate_id, id),
+    CONSTRAINT chk_message_outbox_status
+        CHECK (status IN ('PENDING', 'PROCESSING', 'RETRY', 'SENT', 'DEAD'))
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='transactional outbox';

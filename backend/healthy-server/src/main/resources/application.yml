@@ -29,7 +29,7 @@ spring:
         prefetch: 1
         retry:
           enabled: true
-          max-attempts: 3
+          max-retries: 2
           initial-interval: 500ms
           multiplier: 2
           max-interval: 2s
@@ -69,6 +69,15 @@ appointment:
   stock:
     repair-delay: 3s
     repair-check-ttl: 8s
+  outbox:
+    relay-enabled: true
+    relay-delay: 1s
+    batch-size: 50
+    max-attempts: 5
+    retry-initial-delay: 5s
+    retry-multiplier: 3
+    retry-max-delay: 5m
+    processing-timeout: 1m
   waitlist:
     offer-duration: 10s
     offer-expire-check-delay: 2m

@@ -16,3 +16,7 @@ spring:
         auto-startup: false
       direct:
         auto-startup: false
+
+appointment:
+  outbox:
+    relay-enabled: false

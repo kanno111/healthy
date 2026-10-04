@@ -29,7 +29,7 @@ public class AuthServiceImpl implements AuthService {
 
     @Override
     public LoginVO login(LoginDTO loginDTO) {
-        SysUser user = sysUserMapper.selectOne(new LambdaQueryWrapper<SysUser>()
+        SysUser user = sysUserMapper.selectOne(new LambdaQueryWrapper<>(SysUser.class)
                 .eq(SysUser::getUsername, loginDTO.getUsername())
                 .eq(SysUser::getStatus, 1)
                 .last("LIMIT 1"));
@@ -44,10 +44,10 @@ public class AuthServiceImpl implements AuthService {
     @Override
     @Transactional
     public void register(RegisterDTO registerDTO) {
-        if (sysUserMapper.exists(new LambdaQueryWrapper<SysUser>().eq(SysUser::getUsername, registerDTO.getUsername()))) {
+        if (sysUserMapper.exists(new LambdaQueryWrapper<>(SysUser.class).eq(SysUser::getUsername, registerDTO.getUsername()))) {
             throw new BusinessException(ErrorCode.USERNAME_EXISTS);
         }
-        if (sysUserMapper.exists(new LambdaQueryWrapper<SysUser>().eq(SysUser::getPhone, registerDTO.getPhone()))) {
+        if (sysUserMapper.exists(new LambdaQueryWrapper<>(SysUser.class).eq(SysUser::getPhone, registerDTO.getPhone()))) {
             throw new BusinessException(ErrorCode.PHONE_EXISTS);
         }
         SysUser user = new SysUser();

@@ -1,0 +1,67 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.healthy.appointment.mapper.OutboxMessageMapper">
+    <sql id="columns">
+        id, event_id, aggregate_type, aggregate_id, event_type, payload,
+        exchange_name, routing_key, scheduled_at, status, attempt_count,
+        next_retry_at, processing_started_at, last_error, sent_at, created_at, updated_at
+    </sql>
+
+    <select id="selectDispatchable" resultType="com.healthy.appointment.entity.OutboxMessage">
+        SELECT <include refid="columns"/>
+        FROM message_outbox
+        WHERE status IN ('PENDING', 'RETRY')
+          AND next_retry_at &lt;= #{now}
+        ORDER BY next_retry_at ASC, id ASC
+        LIMIT #{limit}
+    </select>
+
+    <update id="markProcessing">
+        UPDATE message_outbox
+        SET status = 'PROCESSING',
+            attempt_count = attempt_count + 1,
+            processing_started_at = #{now},
+            last_error = NULL
+        WHERE id = #{id}
+          AND status IN ('PENDING', 'RETRY')
+          AND next_retry_at &lt;= #{now}
+    </update>
+
+    <update id="markSent">
+        UPDATE message_outbox
+        SET status = 'SENT',
+            sent_at = #{now},
+            processing_started_at = NULL,
+            last_error = NULL
+        WHERE id = #{id}
+          AND status = 'PROCESSING'
+          AND attempt_count = #{attemptCount}
+    </update>
+
+    <update id="markFailed">
+        UPDATE message_outbox
+        SET status = #{status},
+            next_retry_at = #{nextRetryAt},
+            processing_started_at = NULL,
+            last_error = #{lastError}
+        WHERE id = #{id}
+          AND status = 'PROCESSING'
+          AND attempt_count = #{attemptCount}
+    </update>
+
+    <update id="recoverTimedOutProcessing">
+        UPDATE message_outbox
+        SET status = CASE WHEN attempt_count &gt;= #{maxAttempts} THEN 'DEAD' ELSE 'RETRY' END,
+            next_retry_at = #{now},
+            processing_started_at = NULL,
+            last_error = CASE
+                WHEN attempt_count &gt;= #{maxAttempts}
+                    THEN 'Publisher confirm timed out and all attempts were exhausted'
+                ELSE 'Publisher confirm timed out; recovered by outbox relay'
+            END
+        WHERE status = 'PROCESSING'
+          AND processing_started_at &lt;= #{deadline}
+    </update>
+</mapper>

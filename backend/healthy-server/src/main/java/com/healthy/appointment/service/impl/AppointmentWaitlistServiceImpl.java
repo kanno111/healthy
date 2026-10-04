@@ -14,9 +14,9 @@ import com.healthy.appointment.mapper.AppointmentMapper;
 import com.healthy.appointment.mapper.AppointmentWaitlistMapper;
 import com.healthy.appointment.mapper.DoctorScheduleSlotMapper;
 import com.healthy.appointment.mapper.PatientMapper;
-import com.healthy.appointment.mq.WaitlistTimeoutMessagePublisher;
 import com.healthy.appointment.service.AppointmentWaitlistService;
 import com.healthy.appointment.service.AppointmentStockService;
+import com.healthy.appointment.service.OutboxMessageService;
 import com.healthy.appointment.vo.PatientAppointmentWaitlistVO;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -48,7 +48,7 @@ public class AppointmentWaitlistServiceImpl implements AppointmentWaitlistServic
     private final AppointmentWaitlistMapper appointmentWaitlistMapper;
     private final AppointmentStockService appointmentStockService;
     private final AppointmentWaitlistProperties appointmentWaitlistProperties;
-    private final WaitlistTimeoutMessagePublisher waitlistTimeoutMessagePublisher;
+    private final OutboxMessageService outboxMessageService;
 
     @Override
     @Transactional(rollbackFor = Exception.class)
@@ -105,7 +105,7 @@ public class AppointmentWaitlistServiceImpl implements AppointmentWaitlistServic
     @Override
     public void cancel(Long userId, Long waitlistId) {
         Long patientId = findEnabledPatientId(userId);
-        AppointmentWaitlist waitlist = appointmentWaitlistMapper.selectOne(new LambdaQueryWrapper<AppointmentWaitlist>()
+        AppointmentWaitlist waitlist = appointmentWaitlistMapper.selectOne(new LambdaQueryWrapper<>(AppointmentWaitlist.class)
                 .eq(AppointmentWaitlist::getId, waitlistId)
                 .eq(AppointmentWaitlist::getPatientId, patientId));
         if (waitlist == null) {
@@ -115,7 +115,7 @@ public class AppointmentWaitlistServiceImpl implements AppointmentWaitlistServic
             throw new BusinessException(ErrorCode.CONFLICT);
         }
 
-        int updated = appointmentWaitlistMapper.update(null, new LambdaUpdateWrapper<AppointmentWaitlist>()
+        int updated = appointmentWaitlistMapper.update(null, new LambdaUpdateWrapper<>(AppointmentWaitlist.class)
                 .eq(AppointmentWaitlist::getId, waitlistId)
                 .eq(AppointmentWaitlist::getPatientId, patientId)
                 .eq(AppointmentWaitlist::getStatus, WAITLIST_STATUS_WAITING)
@@ -146,7 +146,7 @@ public class AppointmentWaitlistServiceImpl implements AppointmentWaitlistServic
         }
 
         LocalDateTime offerExpireTime = LocalDateTime.now().plus(appointmentWaitlistProperties.getOfferDuration());
-        int updated = appointmentWaitlistMapper.update(null, new LambdaUpdateWrapper<AppointmentWaitlist>()
+        int updated = appointmentWaitlistMapper.update(null, new LambdaUpdateWrapper<>(AppointmentWaitlist.class)
                 .eq(AppointmentWaitlist::getId, waiting.getId())
                 .eq(AppointmentWaitlist::getStatus, WAITLIST_STATUS_WAITING)
                 .set(AppointmentWaitlist::getStatus, WAITLIST_STATUS_OFFERED)
@@ -160,7 +160,7 @@ public class AppointmentWaitlistServiceImpl implements AppointmentWaitlistServic
                 "Waitlist status changed: waitlistId={}, patientId={}, slotId={}, oldStatus={}, newStatus={}, offerExpireTime={}",
                 waiting.getId(), waiting.getPatientId(), scheduleSlotId,
                 WAITLIST_STATUS_WAITING, WAITLIST_STATUS_OFFERED, offerExpireTime));
-        waitlistTimeoutMessagePublisher.publishAfterCommit(waiting.getId(), scheduleSlotId);
+        outboxMessageService.recordWaitlistTimeout(waiting.getId(), scheduleSlotId, offerExpireTime);
         return true;
     }
 
@@ -168,7 +168,7 @@ public class AppointmentWaitlistServiceImpl implements AppointmentWaitlistServic
     @Transactional(rollbackFor = Exception.class)
     public void confirm(Long userId, Long waitlistId) {
         Long patientId = findEnabledPatientId(userId);
-        AppointmentWaitlist waitlist = appointmentWaitlistMapper.selectOne(new LambdaQueryWrapper<AppointmentWaitlist>()
+        AppointmentWaitlist waitlist = appointmentWaitlistMapper.selectOne(new LambdaQueryWrapper<>(AppointmentWaitlist.class)
                 .eq(AppointmentWaitlist::getId, waitlistId)
                 .eq(AppointmentWaitlist::getPatientId, patientId));
         if (waitlist == null) {
@@ -192,7 +192,7 @@ public class AppointmentWaitlistServiceImpl implements AppointmentWaitlistServic
             throw new BusinessException(ErrorCode.CONFLICT);
         }
 
-        int confirmed = appointmentWaitlistMapper.update(null, new LambdaUpdateWrapper<AppointmentWaitlist>()
+        int confirmed = appointmentWaitlistMapper.update(null, new LambdaUpdateWrapper<>(AppointmentWaitlist.class)
                 .eq(AppointmentWaitlist::getId, waitlistId)
                 .eq(AppointmentWaitlist::getPatientId, patientId)
                 .eq(AppointmentWaitlist::getStatus, WAITLIST_STATUS_OFFERED)
@@ -233,7 +233,7 @@ public class AppointmentWaitlistServiceImpl implements AppointmentWaitlistServic
             return false;
         }
         LocalDateTime now = LocalDateTime.now();
-        int expired = appointmentWaitlistMapper.update(null, new LambdaUpdateWrapper<AppointmentWaitlist>()
+        int expired = appointmentWaitlistMapper.update(null, new LambdaUpdateWrapper<>(AppointmentWaitlist.class)
                 .eq(AppointmentWaitlist::getId, waitlistId)
                 .eq(AppointmentWaitlist::getStatus, WAITLIST_STATUS_OFFERED)
                 .le(AppointmentWaitlist::getOfferExpireTime, now)
@@ -277,7 +277,7 @@ public class AppointmentWaitlistServiceImpl implements AppointmentWaitlistServic
     }
 
     private AppointmentWaitlist findActiveWaitlist(Long patientId, Long slotId) {
-        return appointmentWaitlistMapper.selectOne(new LambdaQueryWrapper<AppointmentWaitlist>()
+        return appointmentWaitlistMapper.selectOne(new LambdaQueryWrapper<>(AppointmentWaitlist.class)
                 .eq(AppointmentWaitlist::getPatientId, patientId)
                 .eq(AppointmentWaitlist::getScheduleSlotId, slotId)
                 .in(AppointmentWaitlist::getStatus, "WAITING", "OFFERED"));
@@ -313,7 +313,7 @@ public class AppointmentWaitlistServiceImpl implements AppointmentWaitlistServic
     }
 
     private Long findEnabledPatientId(Long userId) {
-        Patient patient = patientMapper.selectOne(new LambdaQueryWrapper<Patient>()
+        Patient patient = patientMapper.selectOne(new LambdaQueryWrapper<>(Patient.class)
                 .select(Patient::getId)
                 .eq(Patient::getUserId, userId)
                 .eq(Patient::getStatus, 1)
