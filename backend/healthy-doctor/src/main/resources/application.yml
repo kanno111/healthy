@@ -8,9 +8,16 @@ spring:
     name: healthy-doctor
   datasource:
     driver-class-name: com.mysql.cj.jdbc.Driver
-    url: jdbc:mysql://${DB_HOST:localhost}:${DB_PORT:3306}/${DB_NAME:healthy}?useUnicode=true&characterEncoding=utf8&serverTimezone=Asia/Shanghai
-    username: ${DB_USERNAME:root}
-    password: ${DB_PASSWORD:}
+    url: jdbc:mysql://${DOCTOR_DB_HOST:${DB_HOST:localhost}}:${DOCTOR_DB_PORT:${DB_PORT:3306}}/${DOCTOR_DB_NAME:healthy_doctor}?useUnicode=true&characterEncoding=utf8&serverTimezone=Asia/Shanghai
+    username: ${DOCTOR_DB_USERNAME:${DB_USERNAME:root}}
+    password: ${DOCTOR_DB_PASSWORD:${DB_PASSWORD:}}
+  flyway:
+    enabled: true
+    locations: classpath:db/migration
+    validate-on-migrate: true
+    validate-migration-naming: true
+    clean-disabled: true
+    fail-on-missing-locations: true
   config:
     import:
       - optional:nacos:${spring.application.name}.yaml?group=${NACOS_CONFIG_GROUP:DEFAULT_GROUP}&refreshEnabled=true

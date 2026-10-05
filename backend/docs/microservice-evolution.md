@@ -2,7 +2,7 @@
 
 ## 当前落地范围
 
-项目已经从单体演进为 Gateway、identity/booking 服务和 doctor-service 三个进程。医生、科室代码已切换到 doctor-service；identity 与 booking 暂时仍在 `healthy-server`，以避免一次拆分过多核心事务。
+项目已经从单体演进为 Gateway、identity/booking 服务和 doctor-service 三个进程。医生、科室代码及数据已切换到 doctor-service；identity 与 booking 暂时仍在 `healthy-server`，以避免一次拆分过多核心事务。
 
 版本基线：
 
@@ -56,13 +56,14 @@ Vue / Nginx
     -> healthy-server:8081
        - identity / booking
        - DoctorDirectory 远程适配器
-       - MySQL / Redis / RabbitMQ
+       - healthy 数据库 / Redis / RabbitMQ
 
     healthy-doctor:8082
        - 已注册 Nacos
        - 提供 booking 所需的科室、医生内部查询接口
        - 提供受 Gateway 身份上下文保护的医生/科室管理 API 与患者科室 API
        - 拥有医生、科室查询和写入的数据访问逻辑
+       - 独占 healthy_doctor 数据库与 Flyway
 ```
 
 `healthy-server`、`healthy-gateway` 和 `healthy-doctor` 都注册到 Nacos。Gateway 优先把医生管理、科室管理和患者科室查询路由到 `lb://healthy-doctor`，再用 `/api/**` 兜底路由到 `lb://healthy-server`。Gateway 校验 JWT 与 Redis 会话，并向 doctor-service 注入可信用户 ID 和角色。
@@ -71,10 +72,10 @@ Vue / Nginx
 
 ## 下一次真正抽服务的顺序
 
-1. doctor-service 已完成代码层抽取，医生/科室公共 API 已由 Gateway 直接路由；当前仅数据库仍共享。
+1. doctor-service 已完成代码和数据库抽取，医生/科室公共 API 已由 Gateway 直接路由，并独占 `healthy_doctor`。
 2. booking 已固定使用 Feign 医生目录，并保留批量接口，避免循环远程调用。
 3. 下一步再抽 identity-service；认证可先留在原服务，稳定后再把登录与 Redis 会话迁走。
 4. 最后把剩余项目重命名为 booking-service。Outbox、RabbitMQ 和候补补偿整体保留在 booking 内部。
-5. 服务各自拥有数据库 schema 和 Flyway 迁移。跨服务只保存 ID，不建立数据库外键，也不跨库 JOIN。
+5. 服务各自拥有数据库 schema 和 Flyway 迁移。（doctor-service 已完成；identity 与 booking 待后续拆分。）跨服务只保存 ID，不建立数据库外键，也不跨库 JOIN。
 
 这条路线不要求分布式事务：强一致的预约聚合留在 booking 本地事务内；跨服务资料查询接受短暂不一致，必要时使用缓存或事件驱动读模型。Outbox 继续解决 booking 本地事务提交与 RabbitMQ 发布之间的可靠性问题。

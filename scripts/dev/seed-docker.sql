@@ -1,8 +1,10 @@
 -- Development-only sample data for the Docker MySQL database.
 -- Do not place this file in Flyway's db/migration directory.
 -- Safe to run repeatedly: stable usernames/codes/numbers and upserts prevent duplicates.
+-- This development script expects healthy and healthy_doctor on the same MySQL instance.
 
 SET NAMES utf8mb4;
+USE healthy;
 START TRANSACTION;
 
 SET @demo_password_hash = '$2b$10$N5q5jGVwpklpaouAvMTM.OLB5Dx0nVafbImR6iOQTbjUXfd78AuL6';
@@ -70,7 +72,7 @@ SET @patient_feng_user_id = (SELECT id FROM sys_user WHERE username = 'patient_f
 SET @patient_he_user_id = (SELECT id FROM sys_user WHERE username = 'patient_he');
 SET @patient_luo_user_id = (SELECT id FROM sys_user WHERE username = 'patient_luo');
 
-INSERT INTO department (name, description, sort_order, status)
+INSERT INTO healthy_doctor.department (name, description, sort_order, status)
 VALUES
     ('心血管内科', '提供常见心血管疾病门诊咨询与复诊服务。', 10, 1),
     ('消化内科', '提供消化系统常见疾病门诊咨询服务。', 20, 1),
@@ -85,14 +87,14 @@ ON DUPLICATE KEY UPDATE
     sort_order = VALUES(sort_order),
     status = VALUES(status);
 
-SET @cardio_department_id = (SELECT id FROM department WHERE name = '心血管内科');
-SET @digestive_department_id = (SELECT id FROM department WHERE name = '消化内科');
-SET @pediatrics_department_id = (SELECT id FROM department WHERE name = '儿科');
-SET @respiratory_department_id = (SELECT id FROM department WHERE name = '呼吸内科');
-SET @neurology_department_id = (SELECT id FROM department WHERE name = '神经内科');
-SET @orthopedics_department_id = (SELECT id FROM department WHERE name = '骨科');
-SET @dermatology_department_id = (SELECT id FROM department WHERE name = '皮肤科');
-SET @ophthalmology_department_id = (SELECT id FROM department WHERE name = '眼科');
+SET @cardio_department_id = (SELECT id FROM healthy_doctor.department WHERE name = '心血管内科');
+SET @digestive_department_id = (SELECT id FROM healthy_doctor.department WHERE name = '消化内科');
+SET @pediatrics_department_id = (SELECT id FROM healthy_doctor.department WHERE name = '儿科');
+SET @respiratory_department_id = (SELECT id FROM healthy_doctor.department WHERE name = '呼吸内科');
+SET @neurology_department_id = (SELECT id FROM healthy_doctor.department WHERE name = '神经内科');
+SET @orthopedics_department_id = (SELECT id FROM healthy_doctor.department WHERE name = '骨科');
+SET @dermatology_department_id = (SELECT id FROM healthy_doctor.department WHERE name = '皮肤科');
+SET @ophthalmology_department_id = (SELECT id FROM healthy_doctor.department WHERE name = '眼科');
 
 INSERT INTO patient (user_id, real_name, gender, birthday, id_card, medical_card_no, status)
 VALUES
@@ -126,7 +128,7 @@ SET @patient_feng_id = (SELECT id FROM patient WHERE user_id = @patient_feng_use
 SET @patient_he_id = (SELECT id FROM patient WHERE user_id = @patient_he_user_id);
 SET @patient_luo_id = (SELECT id FROM patient WHERE user_id = @patient_luo_user_id);
 
-INSERT INTO doctor (
+INSERT INTO healthy_doctor.doctor (
     user_id, name, gender, department_id, doctor_code, title,
     introduction, avatar_url, sort_order, status
 )
@@ -160,16 +162,16 @@ ON DUPLICATE KEY UPDATE
     sort_order = VALUES(sort_order),
     status = VALUES(status);
 
-SET @cardio_doctor_id = (SELECT id FROM doctor WHERE doctor_code = 'DOC-CARDIO-001');
-SET @cardio_2_doctor_id = (SELECT id FROM doctor WHERE doctor_code = 'DOC-CARDIO-002');
-SET @digestive_doctor_id = (SELECT id FROM doctor WHERE doctor_code = 'DOC-DIGEST-001');
-SET @digestive_2_doctor_id = (SELECT id FROM doctor WHERE doctor_code = 'DOC-DIGEST-002');
-SET @pediatrics_doctor_id = (SELECT id FROM doctor WHERE doctor_code = 'DOC-PEDS-001');
-SET @respiratory_doctor_id = (SELECT id FROM doctor WHERE doctor_code = 'DOC-RESP-001');
-SET @neurology_doctor_id = (SELECT id FROM doctor WHERE doctor_code = 'DOC-NEURO-001');
-SET @orthopedics_doctor_id = (SELECT id FROM doctor WHERE doctor_code = 'DOC-ORTHO-001');
-SET @dermatology_doctor_id = (SELECT id FROM doctor WHERE doctor_code = 'DOC-DERM-001');
-SET @ophthalmology_doctor_id = (SELECT id FROM doctor WHERE doctor_code = 'DOC-OPHTH-001');
+SET @cardio_doctor_id = (SELECT id FROM healthy_doctor.doctor WHERE doctor_code = 'DOC-CARDIO-001');
+SET @cardio_2_doctor_id = (SELECT id FROM healthy_doctor.doctor WHERE doctor_code = 'DOC-CARDIO-002');
+SET @digestive_doctor_id = (SELECT id FROM healthy_doctor.doctor WHERE doctor_code = 'DOC-DIGEST-001');
+SET @digestive_2_doctor_id = (SELECT id FROM healthy_doctor.doctor WHERE doctor_code = 'DOC-DIGEST-002');
+SET @pediatrics_doctor_id = (SELECT id FROM healthy_doctor.doctor WHERE doctor_code = 'DOC-PEDS-001');
+SET @respiratory_doctor_id = (SELECT id FROM healthy_doctor.doctor WHERE doctor_code = 'DOC-RESP-001');
+SET @neurology_doctor_id = (SELECT id FROM healthy_doctor.doctor WHERE doctor_code = 'DOC-NEURO-001');
+SET @orthopedics_doctor_id = (SELECT id FROM healthy_doctor.doctor WHERE doctor_code = 'DOC-ORTHO-001');
+SET @dermatology_doctor_id = (SELECT id FROM healthy_doctor.doctor WHERE doctor_code = 'DOC-DERM-001');
+SET @ophthalmology_doctor_id = (SELECT id FROM healthy_doctor.doctor WHERE doctor_code = 'DOC-OPHTH-001');
 
 INSERT INTO doctor_schedule_slot (
     doctor_id, schedule_date, session_type, session_name, start_time, end_time,
@@ -209,7 +211,7 @@ SELECT
     DATE_ADD(@today, INTERVAL demo_day.day_offset DAY),
     'MORNING', '上午门诊', '08:00:00', '12:00:00',
     20, 8, 8, 1, 'OPEN', 0
-FROM doctor demo_doctor
+FROM healthy_doctor.doctor demo_doctor
 CROSS JOIN (
     SELECT 0 AS day_offset UNION ALL SELECT 1 UNION ALL SELECT 2 UNION ALL SELECT 3
     UNION ALL SELECT 4 UNION ALL SELECT 5 UNION ALL SELECT 6 UNION ALL SELECT 7

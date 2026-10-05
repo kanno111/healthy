@@ -22,7 +22,7 @@
 - 不移动排班和库存。
 - 不修改 Outbox、RabbitMQ 候补超时消费和最终补偿。
 
-第一轮允许 doctor-service 和 healthy-server 连接同一个本机 MySQL。当前 `healthy-server` 已删除医生、科室的 Controller、Service 与 Mapper；booking 只能通过 Feign 访问所需主数据。代码边界已经完成，下一阶段再拆独立 Schema 与 Flyway。
+第一轮曾允许 doctor-service 和 healthy-server 连接同一个本机 MySQL。当前 `healthy-server` 已删除医生、科室的 Controller、Service 与 Mapper；booking 只能通过 Feign 访问所需主数据。数据库边界也已落地：`healthy-server` 使用 `healthy`，doctor-service 独占 `healthy_doctor` 及其 Flyway。
 
 ## 3. 当前迁移结果
 
@@ -44,7 +44,7 @@
 
 - `healthy-doctor` 使用自己的医生/科室 Query Mapper 与 Command Mapper。
 - `healthy-server` 中的医生/科室 Mapper、XML 和 `LocalDoctorDirectory` 已删除。
-- DTO、实体和 VO 暂时位于共享模块，等数据库 Schema 拆分时再继续收窄共享模型。
+- DTO、实体和 VO 暂时位于共享模块。数据库所有权已经拆开，收窄共享 Java 模型作为后续独立重构处理。
 
 ## 4. 继续留在 booking 的代码
 
@@ -104,9 +104,30 @@ domain.doctor
 4. doctor-service 暴露管理端医生接口，Gateway 直接路由。（已完成）
 5. 删除 healthy-server 中重复的医生 Controller、Service、Mapper 和本地适配器。（已完成）
 6. 迁移管理端科室与患者端科室公开接口，删除 healthy-server 的科室访问代码。（已完成）
-7. 后续拆分数据库 Schema 与 Flyway。
+7. 拆分数据库 Schema 与 Flyway。（已完成）
 
-## 8. Gateway 路由边界
+## 8. 数据库迁移与回滚顺序
+
+两个服务即使共用同一个 MySQL 实例，也使用不同数据库：
+
+```text
+healthy-server -> healthy
+healthy-doctor -> healthy_doctor
+```
+
+旧环境从共享库升级时必须按以下顺序执行：
+
+1. 停止 Gateway、healthy-server 和 healthy-doctor，冻结医生/科室写入。
+2. 备份旧库中的 `department`、`doctor`。
+3. 创建空的 `healthy_doctor` 数据库。
+4. 单独启动 healthy-doctor，使它执行自己的 Flyway V1 后再停止。
+5. 执行 `scripts/db/copy-doctor-data.sql`，必须确认两项 mismatch count 均为 `0`，源端与目标端行数一致。
+6. 使用 `healthy_doctor` 启动 doctor-service，并验证内部查询及 Gateway 路由。
+7. 最后启动 healthy-server，让它执行 V12，删除旧库中的 `doctor`、`department`。
+
+复制时保留原始主键，因此 booking 中已有的 `doctor_id` 无需修改。V12 之后，booking 数据库只保留逻辑 `doctor_id`，不建立跨数据库外键，也不允许跨库 JOIN。若第 6 步验证失败，应在 V12 前停止升级并继续使用原库；V12 已执行后可从备份或 `healthy_doctor` 按原 ID 恢复。
+
+## 9. Gateway 路由边界
 
 当前直接路由到 doctor-service 的接口：
 
@@ -141,7 +162,7 @@ Gateway 所在内部网络传递的这两个头；生产部署只对公网暴露
 Gateway 与发放 Token 的服务必须使用相同的 `JWT_SECRET` 和 Redis database，
 否则 Gateway 会将有效登录会话误判为未登录。
 
-## 9. 逐步提交顺序
+## 10. 逐步提交顺序
 
 每完成一步就停止，不连续实现下一步：
 
@@ -168,10 +189,10 @@ Gateway 与发放 Token 的服务必须使用相同的 `JWT_SECRET` 和 Redis da
 18. `refactor: remove local doctor persistence access`（已完成）
 19. `feat: expose department APIs from doctor service`（已完成）
 20. `refactor: remove local department persistence access`（已完成）
-21. `refactor: isolate doctor database schema`
-22. `refactor: separate doctor Flyway migrations`
+21. `refactor: isolate doctor database schema`（已完成）
+22. `refactor: separate doctor Flyway migrations`（已完成）
 
-## 10. 每一步的验收规则
+## 11. 每一步的验收规则
 
 - 单次提交只包含一个目标。
 - 修改前先说明调用链是否变化。
