@@ -8,7 +8,7 @@
         COUNT(doc.id) AS doctor_count
     </sql>
 
-    <select id="list" resultType="com.healthy.appointment.vo.DepartmentVO">
+    <select id="list" resultType="com.healthy.doctor.vo.DepartmentVO">
         SELECT <include refid="departmentColumns"/>
         FROM department d
         LEFT JOIN doctor doc ON doc.department_id = d.id
@@ -20,7 +20,7 @@
         ORDER BY d.sort_order ASC, d.id ASC
     </select>
 
-    <select id="findById" resultType="com.healthy.appointment.vo.DepartmentVO">
+    <select id="findById" resultType="com.healthy.doctor.vo.DepartmentVO">
         SELECT <include refid="departmentColumns"/>
         FROM department d
         LEFT JOIN doctor doc ON doc.department_id = d.id

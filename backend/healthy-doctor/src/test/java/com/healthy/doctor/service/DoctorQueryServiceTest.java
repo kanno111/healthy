@@ -4,9 +4,9 @@ import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.healthy.appointment.enumeration.ErrorCode;
 import com.healthy.appointment.exception.BusinessException;
-import com.healthy.appointment.vo.DoctorVO;
 import com.healthy.doctor.mapper.DoctorQueryMapper;
 import com.healthy.doctor.model.DoctorQueryView;
+import com.healthy.doctor.vo.DoctorVO;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
@@ -34,9 +34,9 @@ class DoctorQueryServiceTest {
 
     @Test
     void pagesDoctorsWithNormalizedName() {
-        DoctorVO doctor = new DoctorVO();
+        DoctorQueryView doctor = new DoctorQueryView();
         doctor.setId(8L);
-        Page<DoctorVO> resultPage = new Page<>(2, 10);
+        Page<DoctorQueryView> resultPage = new Page<>(2, 10);
         resultPage.setTotal(21);
         resultPage.setRecords(List.of(doctor));
         when(doctorQueryMapper.page(any(), eq("Zhang"), isNull(), eq(1L), eq(1), isNull()))
@@ -44,18 +44,26 @@ class DoctorQueryServiceTest {
 
         var result = doctorQueryService.page("  Zhang  ", 1L, 1, 2, 10);
 
-        assertThat(result.records()).containsExactly(doctor);
+        assertThat(result.records()).extracting(DoctorVO::getId).containsExactly(8L);
         assertThat(result.total()).isEqualTo(21);
         assertThat(result.totalPages()).isEqualTo(3);
     }
 
     @Test
     void visiblePageRestrictsDoctorAndDepartmentStatus() {
+        DoctorQueryView doctor = new DoctorQueryView();
+        doctor.setId(8L);
+        doctor.setUserId(100L);
+        Page<DoctorQueryView> resultPage = new Page<>(1, 10);
+        resultPage.setTotal(1);
+        resultPage.setRecords(List.of(doctor));
         when(doctorQueryMapper.page(any(), isNull(), eq("cardiology"), eq(1L), eq(1), eq(1)))
-                .thenReturn(new Page<>(1, 10));
+                .thenReturn(resultPage);
 
-        doctorQueryService.pageVisible(1L, " cardiology ", 1, 10);
+        var result = doctorQueryService.pageVisible(1L, " cardiology ", 1, 10);
 
+        assertThat(result.records()).containsExactly(doctor);
+        assertThat(result.records().getFirst().getUserId()).isEqualTo(100L);
         verify(doctorQueryMapper).page(any(), isNull(), eq("cardiology"), eq(1L), eq(1), eq(1));
     }
 

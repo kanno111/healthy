@@ -44,7 +44,8 @@
 
 - `healthy-doctor` 使用自己的医生/科室 Query Mapper 与 Command Mapper。
 - `healthy-server` 中的医生/科室 Mapper、XML 和 `LocalDoctorDirectory` 已删除。
-- DTO、实体和 VO 暂时位于共享模块。数据库所有权已经拆开，收窄共享 Java 模型作为后续独立重构处理。
+- 医生、科室的实体、DTO 和 VO 已归属 `healthy-doctor`，该服务不再依赖 `healthy-pojo`。
+- 内部 HTTP 两端各自维护契约模型：doctor-service 返回 `DoctorQueryView`，booking 使用本地 `DoctorRemoteView` 反序列化，避免共享业务 DTO 形成编译期耦合。
 
 ## 4. 继续留在 booking 的代码
 

@@ -2,11 +2,11 @@ package com.healthy.doctor.service;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
-import com.healthy.appointment.dto.DoctorSaveDTO;
-import com.healthy.appointment.entity.Department;
-import com.healthy.appointment.entity.Doctor;
 import com.healthy.appointment.enumeration.ErrorCode;
 import com.healthy.appointment.exception.BusinessException;
+import com.healthy.doctor.dto.DoctorSaveDTO;
+import com.healthy.doctor.entity.Department;
+import com.healthy.doctor.entity.Doctor;
 import com.healthy.doctor.mapper.DepartmentCommandMapper;
 import com.healthy.doctor.mapper.DoctorCommandMapper;
 import org.springframework.stereotype.Service;

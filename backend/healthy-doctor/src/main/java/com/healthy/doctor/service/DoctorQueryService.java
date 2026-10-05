@@ -5,9 +5,9 @@ import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.healthy.appointment.enumeration.ErrorCode;
 import com.healthy.appointment.exception.BusinessException;
 import com.healthy.appointment.result.PageResult;
-import com.healthy.appointment.vo.DoctorVO;
 import com.healthy.doctor.mapper.DoctorQueryMapper;
 import com.healthy.doctor.model.DoctorQueryView;
+import com.healthy.doctor.vo.DoctorVO;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -28,10 +28,17 @@ public class DoctorQueryService {
     public PageResult<DoctorVO> page(
             String name, Long departmentId, Integer status, int page, int pageSize) {
         validateStatusIfPresent(status);
-        return pageDoctors(blankToNull(name), null, departmentId, status, null, page, pageSize);
+        PageResult<DoctorQueryView> result = pageDoctors(
+                blankToNull(name), null, departmentId, status, null, page, pageSize);
+        return PageResult.of(
+                result.records().stream().map(this::toDoctorVO).toList(),
+                result.total(),
+                result.page(),
+                result.pageSize()
+        );
     }
 
-    public PageResult<DoctorVO> pageVisible(
+    public PageResult<DoctorQueryView> pageVisible(
             Long departmentId, String keyword, int page, int pageSize) {
         return pageDoctors(null, blankToNull(keyword), departmentId, 1, 1, page, pageSize);
     }
@@ -71,7 +78,7 @@ public class DoctorQueryService {
         return doctorQueryMapper.findIdsByDepartment(departmentId);
     }
 
-    private PageResult<DoctorVO> pageDoctors(
+    private PageResult<DoctorQueryView> pageDoctors(
             String name,
             String keyword,
             Long departmentId,
@@ -81,7 +88,7 @@ public class DoctorQueryService {
             int pageSize
     ) {
         validatePage(page, pageSize);
-        IPage<DoctorVO> result = doctorQueryMapper.page(
+        IPage<DoctorQueryView> result = doctorQueryMapper.page(
                 new Page<>(page, pageSize), name, keyword, departmentId, status, departmentStatus);
         return PageResult.of(result.getRecords(), result.getTotal(), page, pageSize);
     }

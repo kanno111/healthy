@@ -2,7 +2,6 @@ package com.healthy.doctor.controller;
 
 import com.healthy.appointment.result.ApiResponse;
 import com.healthy.appointment.result.PageResult;
-import com.healthy.appointment.vo.DoctorVO;
 import com.healthy.doctor.model.DoctorQueryView;
 import com.healthy.doctor.service.DoctorQueryService;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -25,7 +24,7 @@ public class InternalDoctorQueryController {
     }
 
     @GetMapping("/visible")
-    public ApiResponse<PageResult<DoctorVO>> pageVisible(
+    public ApiResponse<PageResult<DoctorQueryView>> pageVisible(
             @RequestParam(required = false) Long departmentId,
             @RequestParam(required = false) String keyword,
             @RequestParam int page,

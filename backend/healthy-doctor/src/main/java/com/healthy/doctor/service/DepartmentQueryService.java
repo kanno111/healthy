@@ -2,9 +2,9 @@ package com.healthy.doctor.service;
 
 import com.healthy.appointment.enumeration.ErrorCode;
 import com.healthy.appointment.exception.BusinessException;
-import com.healthy.appointment.vo.DepartmentVO;
-import com.healthy.appointment.vo.PatientDepartmentVO;
 import com.healthy.doctor.mapper.DepartmentQueryMapper;
+import com.healthy.doctor.vo.DepartmentVO;
+import com.healthy.doctor.vo.PatientDepartmentVO;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 

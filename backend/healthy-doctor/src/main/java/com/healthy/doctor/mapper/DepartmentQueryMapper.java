@@ -1,6 +1,6 @@
 package com.healthy.doctor.mapper;
 
-import com.healthy.appointment.vo.DepartmentVO;
+import com.healthy.doctor.vo.DepartmentVO;
 import org.apache.ibatis.annotations.Param;
 
 import java.util.List;

@@ -5,10 +5,10 @@
 这是一个 Maven 多模块工程：
 
 - `healthy-common`：错误码、统一响应和公共异常。
-- `healthy-pojo`：DTO、实体（Entity）和 VO。
+- `healthy-pojo`：identity/booking 尚未拆出的实体、DTO 和 VO；不再承载 doctor-service 模型。
 - `healthy-server`：identity 与 booking 业务服务，通过 Feign 读取医生主数据。
 - `healthy-gateway`：统一入口，使用 Nacos 服务发现、Spring Cloud Gateway 路由和 Sentinel 限流能力。
-- `healthy-doctor`：doctor-service；拥有医生、科室的查询与写入，直接提供管理端医生/科室 API 和患者端科室列表，并提供 booking 所需的内部查询接口。
+- `healthy-doctor`：doctor-service；拥有医生、科室的数据库和 Java 模型，直接提供管理端医生/科室 API、患者端科室列表及 booking 所需的内部查询接口。
 
 `healthy-server` 的 `DoctorDirectory` 固定通过 Feign 和 Nacos 调用 `healthy-doctor`，不再包含医生或科室本地 Mapper。管理端 `/api/admin/doctors/**`、`/api/admin/departments/**` 与患者端 `/api/user/departments` 均由 Gateway 直接路由至 `healthy-doctor`，前端 API 地址不变。
 
@@ -51,8 +51,8 @@ Gateway 默认监听 `http://localhost:8080`，identity/booking 服务监听 `ht
 - `healthy-server/domain`：跨领域端口、Feign 适配器与批量视图装配
 - `healthy-server/mapper`：identity、booking 数据访问接口与 XML
 - `healthy-gateway`：统一路由、服务发现、限流接入和 Trace ID 透传
-- `healthy-doctor`：医生与科室主数据服务；独占 `healthy_doctor` 数据库及其 Flyway，医生/科室管理 API 和患者科室查询已直接对接 Gateway
-- `healthy-pojo`：实体、DTO 和 VO
+- `healthy-doctor`：医生与科室主数据服务；独占 `healthy_doctor` 数据库、Flyway、实体、DTO 和 VO，医生/科室管理 API 和患者科室查询已直接对接 Gateway
+- `healthy-pojo`：identity/booking 暂时共用的实体、DTO 和 VO；后续随服务拆分继续收窄
 - `healthy-common`：统一响应、异常与错误码
 
 详细的边界、调用关系与后续抽取顺序见 [微服务演进说明](docs/microservice-evolution.md)。

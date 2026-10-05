@@ -1,9 +1,9 @@
 package com.healthy.doctor.service;
 
-import com.healthy.appointment.dto.DepartmentSaveDTO;
-import com.healthy.appointment.entity.Department;
 import com.healthy.appointment.enumeration.ErrorCode;
 import com.healthy.appointment.exception.BusinessException;
+import com.healthy.doctor.dto.DepartmentSaveDTO;
+import com.healthy.doctor.entity.Department;
 import com.healthy.doctor.mapper.DepartmentCommandMapper;
 import com.baomidou.mybatisplus.core.MybatisConfiguration;
 import com.baomidou.mybatisplus.core.metadata.TableInfoHelper;

@@ -1,14 +1,14 @@
 package com.healthy.doctor.controller;
 
-import com.healthy.appointment.dto.DoctorSaveDTO;
 import com.healthy.appointment.result.PageResult;
 import com.healthy.appointment.security.AuthenticatedUserHeaders;
-import com.healthy.appointment.vo.DoctorVO;
+import com.healthy.doctor.dto.DoctorSaveDTO;
 import com.healthy.doctor.handler.DoctorExceptionHandler;
 import com.healthy.doctor.interceptor.GatewayIdentityInterceptor;
 import com.healthy.doctor.interceptor.GatewayStaffRoleInterceptor;
 import com.healthy.doctor.service.DoctorCommandService;
 import com.healthy.doctor.service.DoctorQueryService;
+import com.healthy.doctor.vo.DoctorVO;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;

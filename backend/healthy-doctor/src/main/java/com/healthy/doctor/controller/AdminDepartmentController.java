@@ -1,10 +1,10 @@
 package com.healthy.doctor.controller;
 
-import com.healthy.appointment.dto.DepartmentSaveDTO;
 import com.healthy.appointment.result.ApiResponse;
-import com.healthy.appointment.vo.DepartmentVO;
+import com.healthy.doctor.dto.DepartmentSaveDTO;
 import com.healthy.doctor.service.DepartmentCommandService;
 import com.healthy.doctor.service.DepartmentQueryService;
+import com.healthy.doctor.vo.DepartmentVO;
 import jakarta.validation.Valid;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PatchMapping;

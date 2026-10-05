@@ -1,4 +1,4 @@
-package com.healthy.appointment.dto;
+package com.healthy.doctor.dto;
 
 import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;

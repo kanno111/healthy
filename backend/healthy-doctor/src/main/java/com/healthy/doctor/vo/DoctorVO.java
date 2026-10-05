@@ -1,4 +1,4 @@
-package com.healthy.appointment.vo;
+package com.healthy.doctor.vo;
 
 import lombok.Data;
 
