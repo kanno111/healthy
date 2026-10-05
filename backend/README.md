@@ -6,8 +6,11 @@
 
 - `healthy-common`：错误码、统一响应和公共异常。
 - `healthy-pojo`：DTO、实体（Entity）和 VO。
-- `healthy-server`：当前业务服务，内部已按 identity、provider、booking 边界解耦。
+- `healthy-server`：identity 与 booking 业务服务，通过 Feign 读取医生主数据。
 - `healthy-gateway`：统一入口，使用 Nacos 服务发现、Spring Cloud Gateway 路由和 Sentinel 限流能力。
+- `healthy-doctor`：doctor-service；拥有医生、科室的查询与写入，直接提供管理端医生/科室 API 和患者端科室列表，并提供 booking 所需的内部查询接口。
+
+`healthy-server` 的 `DoctorDirectory` 固定通过 Feign 和 Nacos 调用 `healthy-doctor`，不再包含医生或科室本地 Mapper。管理端 `/api/admin/doctors/**`、`/api/admin/departments/**` 与患者端 `/api/user/departments` 均由 Gateway 直接路由至 `healthy-doctor`，前端 API 地址不变。
 
 ## 本地启动前准备
 
@@ -16,29 +19,32 @@
 3. 启动本机已有的 MySQL（3306）、Redis（6379）和 RabbitMQ（5672）。这三个基础设施不使用 Docker。
 4. 在项目根目录执行 `docker compose -f compose.microservices.yaml up -d nacos`，仅用 Docker 启动新引入的 Nacos（8848，控制台映射到 8849）。
 5. 在本目录执行 `mvn clean package`。
-6. 在两个终端分别运行：
+6. 在三个终端分别运行：
    - `java -jar healthy-server/target/healthy-server-0.0.1-SNAPSHOT.jar`
    - `java -jar healthy-gateway/target/healthy-gateway-0.0.1-SNAPSHOT.jar`
+   - `java -jar healthy-doctor/target/healthy-doctor-0.0.1-SNAPSHOT.jar`
 
-Gateway 默认监听 `http://localhost:8080`，业务服务默认监听 `http://localhost:8081`。前端及 Nginx 继续访问 `GET http://localhost:8080/api/health`，请求由 Gateway 通过 Nacos 转发。
+Gateway 默认监听 `http://localhost:8080`，identity/booking 服务监听 `http://localhost:8081`，doctor-service 监听 `http://localhost:8082`。前端及 Nginx 继续访问 `GET http://localhost:8080/api/health`；可通过 `GET http://localhost:8080/doctor-service/actuator/health` 验证 Gateway 对 doctor-service 的服务发现。
 
 ## 配置环境变量
 
 - `DB_HOST`、`DB_PORT`、`DB_NAME`、`DB_USERNAME`、`DB_PASSWORD`
-- `REDIS_HOST`、`REDIS_PORT`、`REDIS_PASSWORD`
+- `REDIS_HOST`、`REDIS_PORT`、`REDIS_DATABASE`、`REDIS_PASSWORD`
 - `RABBITMQ_HOST`、`RABBITMQ_PORT`、`RABBITMQ_USERNAME`、`RABBITMQ_PASSWORD`
 - `NACOS_SERVER_ADDR`、`NACOS_USERNAME`、`NACOS_PASSWORD`
 - `SENTINEL_DASHBOARD`
+- `JWT_SECRET`（Gateway 必须与签发 Token 的 `healthy-server` 保持一致）
 
 密码不提交到仓库；本地可在 IDE 运行配置中设置上述变量。
 
 ## 当前目录职责
 
-- `healthy-server/controller`：HTTP 接口层
-- `healthy-server/service`：业务编排与事务边界
-- `healthy-server/domain`：跨领域端口、当前本地适配器与批量视图装配
-- `healthy-server/mapper`：MyBatis 数据访问接口与 XML
+- `healthy-server/controller`：identity、booking 与患者聚合接口层
+- `healthy-server/service`：预约业务编排与事务边界
+- `healthy-server/domain`：跨领域端口、Feign 适配器与批量视图装配
+- `healthy-server/mapper`：identity、booking 数据访问接口与 XML
 - `healthy-gateway`：统一路由、服务发现、限流接入和 Trace ID 透传
+- `healthy-doctor`：医生与科室主数据服务；医生/科室管理 API 和患者科室查询已直接对接 Gateway
 - `healthy-pojo`：实体、DTO 和 VO
 - `healthy-common`：统一响应、异常与错误码
 

@@ -2,7 +2,7 @@
 
 ## 当前落地范围
 
-本次完成的是阶段二至阶段五：先验证微服务组件兼容性，再整理领域边界、清理跨领域 JOIN，最后加入 Nacos 与 Gateway。当前仍是一个可运行的业务单体，不会为了数量提前复制三个难以维护的服务进程。
+项目已经从单体演进为 Gateway、identity/booking 服务和 doctor-service 三个进程。医生、科室代码已切换到 doctor-service；identity 与 booking 暂时仍在 `healthy-server`，以避免一次拆分过多核心事务。
 
 版本基线：
 
@@ -34,7 +34,7 @@ Spring Cloud OpenFeign、Nacos Discovery/Config 与 Sentinel 已接入 `healthy-
 
 `PatientDirectory` 是 booking 访问 identity 数据的端口，当前由 `LocalPatientDirectory` 通过本地 Mapper 实现。未来抽出 identity-service 时，只需增加基于 OpenFeign 的远程适配器，并替换 Spring Bean。
 
-`DoctorDirectory` 是 booking 访问医生和科室数据的端口，当前由 `LocalDoctorDirectory` 实现。未来抽出 doctor-service 时，只需增加 Feign 适配器并替换 Spring Bean。
+`DoctorDirectory` 是 booking 访问医生和科室数据的端口，当前由 `FeignDoctorDirectory` 实现，通过 Nacos 服务发现调用 doctor-service。`healthy-server` 已删除本地医生/科室 Controller、Service、Mapper 和本地回退实现，避免两个服务同时拥有主数据访问逻辑。
 
 `BookingViewAssembler` 根据 booking 查询返回的 `patientId`、`doctorId` 做批量查询并装配名称，避免逐条远程调用造成 N+1。预约和候补 Mapper 不再 JOIN identity/doctor-service 表；`MapperDomainBoundaryTest` 会防止跨域 JOIN 被重新引入。
 
@@ -45,24 +45,35 @@ Spring Cloud OpenFeign、Nacos Discovery/Config 与 Sentinel 已接入 `healthy-
 ```text
 Vue / Nginx
     -> healthy-gateway:8080
-       - /api/**
+       - /api/admin/doctors/** -> healthy-doctor
+       - /api/admin/departments/** -> healthy-doctor
+       - /api/user/departments -> healthy-doctor
+       - 其余 /api/** -> healthy-server
+       - /doctor-service/actuator/health（临时内部验通路由）
        - Trace ID
        - Sentinel
        - Nacos LoadBalancer
     -> healthy-server:8081
-       - identity / doctor / booking 本地适配器
+       - identity / booking
+       - DoctorDirectory 远程适配器
        - MySQL / Redis / RabbitMQ
+
+    healthy-doctor:8082
+       - 已注册 Nacos
+       - 提供 booking 所需的科室、医生内部查询接口
+       - 提供受 Gateway 身份上下文保护的医生/科室管理 API 与患者科室 API
+       - 拥有医生、科室查询和写入的数据访问逻辑
 ```
 
-`healthy-server` 和 `healthy-gateway` 都注册到 Nacos。Gateway 的 `/api/**` 路由使用 `lb://healthy-server`，因此前端开发代理与现有 Nginx 仍然访问 8080，无需修改接口地址。
+`healthy-server`、`healthy-gateway` 和 `healthy-doctor` 都注册到 Nacos。Gateway 优先把医生管理、科室管理和患者科室查询路由到 `lb://healthy-doctor`，再用 `/api/**` 兜底路由到 `lb://healthy-server`。Gateway 校验 JWT 与 Redis 会话，并向 doctor-service 注入可信用户 ID 和角色。
 
 本地开发采用混合方式：已经安装的 MySQL、Redis、RabbitMQ 继续运行在宿主机；新引入的 Nacos 使用项目根目录的 `compose.microservices.yaml` 单独启动。该 Compose 不定义前三项服务，因此不会误启动另一套数据库或消息队列。
 
 ## 下一次真正抽服务的顺序
 
-1. 先抽 doctor-service（模块名与 Nacos 服务名为 `healthy-doctor`）。它以查询和基础资料 CRUD 为主，对预约写事务影响最小。
-2. 将当前 `LocalDoctorDirectory` 替换为 Feign 适配器，保持批量接口，不允许循环远程调用。
-3. 再抽 identity-service；认证可先留在原服务，稳定后再把登录与 Redis 会话迁走。
+1. doctor-service 已完成代码层抽取，医生/科室公共 API 已由 Gateway 直接路由；当前仅数据库仍共享。
+2. booking 已固定使用 Feign 医生目录，并保留批量接口，避免循环远程调用。
+3. 下一步再抽 identity-service；认证可先留在原服务，稳定后再把登录与 Redis 会话迁走。
 4. 最后把剩余项目重命名为 booking-service。Outbox、RabbitMQ 和候补补偿整体保留在 booking 内部。
 5. 服务各自拥有数据库 schema 和 Flyway 迁移。跨服务只保存 ID，不建立数据库外键，也不跨库 JOIN。
 

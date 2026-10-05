@@ -21,8 +21,27 @@ spring:
             connect-timeout: 3000
             response-timeout: 10s
           routes:
+            - id: healthy-doctor-internal
+              uri: lb://healthy-doctor
+              order: -100
+              predicates:
+                - Path=/doctor-service/actuator/health
+              filters:
+                - StripPrefix=1
+                - PrefixPath=/api
+            - id: healthy-doctor-admin
+              uri: lb://healthy-doctor
+              order: -100
+              predicates:
+                - Path=/api/admin/doctors,/api/admin/doctors/**,/api/admin/departments,/api/admin/departments/**
+            - id: healthy-doctor-user-departments
+              uri: lb://healthy-doctor
+              order: -100
+              predicates:
+                - Path=/api/user/departments
             - id: healthy-server
               uri: lb://healthy-server
+              order: 0
               predicates:
                 - Path=/api/**
     sentinel:
@@ -40,6 +59,21 @@ spring:
             group-id: ${NACOS_CONFIG_GROUP:DEFAULT_GROUP}
             data-type: json
             rule-type: gw-flow
+
+  data:
+    redis:
+      host: ${REDIS_HOST:localhost}
+      port: ${REDIS_PORT:6379}
+      database: ${REDIS_DATABASE:3}
+      password: ${REDIS_PASSWORD:}
+      timeout: 2s
+
+jwt:
+  secret: ${JWT_SECRET:healthy-appointment-local-development-secret-key-2026}
+
+gateway:
+  auth:
+    enabled: ${GATEWAY_AUTH_ENABLED:true}
 
 management:
   endpoints:

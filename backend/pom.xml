@@ -49,5 +49,6 @@
         <module>healthy-pojo</module>
         <module>healthy-server</module>
         <module>healthy-gateway</module>
+        <module>healthy-doctor</module>
     </modules>
 </project>

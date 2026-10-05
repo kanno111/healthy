@@ -3,7 +3,6 @@ package com.healthy.appointment.controller.user;
 import com.healthy.appointment.result.ApiResponse;
 import com.healthy.appointment.result.PageResult;
 import com.healthy.appointment.service.PatientResourceService;
-import com.healthy.appointment.vo.PatientDepartmentVO;
 import com.healthy.appointment.vo.PatientDoctorVO;
 import com.healthy.appointment.vo.PatientScheduleSlotVO;
 import lombok.RequiredArgsConstructor;
@@ -21,12 +20,6 @@ import java.util.List;
 @RequiredArgsConstructor
 public class PatientResourceController {
     private final PatientResourceService patientResourceService;
-
-    @GetMapping("/departments")
-    /** 查询患者端可见的所有启用科室。 */
-    public ApiResponse<List<PatientDepartmentVO>> listDepartments() {
-        return ApiResponse.success(patientResourceService.listDepartments());
-    }
 
     @GetMapping("/doctors")
     /** 分页查询患者端可见的医生，可按科室和关键词筛选。 */

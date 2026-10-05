@@ -24,6 +24,9 @@ nginx/**/logs/
 nginx/**/temp/
 
 # Runtime logs
+logs/
 backend/**/logs/
 backend/logs/*.log
 log/*.log
+**/hs_err_pid*.log
+**/replay_pid*.log

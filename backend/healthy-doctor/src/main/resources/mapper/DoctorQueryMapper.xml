@@ -1,0 +1,75 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.healthy.doctor.mapper.DoctorQueryMapper">
+    <sql id="doctorColumns">
+        doc.id, doc.name, doc.gender, doc.department_id, dept.name AS department_name,
+        doc.doctor_code, doc.title, doc.introduction, doc.avatar_url, doc.sort_order,
+        doc.status, doc.created_at, doc.updated_at
+    </sql>
+
+    <sql id="internalDoctorColumns">
+        doc.id, doc.user_id, doc.name, doc.gender, doc.department_id,
+        dept.name AS department_name, dept.status AS department_status,
+        doc.doctor_code, doc.title, doc.introduction, doc.avatar_url, doc.sort_order,
+        doc.status, doc.created_at, doc.updated_at
+    </sql>
+
+    <sql id="doctorPageConditions">
+        <where>
+            <if test="name != null">AND doc.name LIKE CONCAT('%', #{name}, '%')</if>
+            <if test="keyword != null">
+                AND (doc.name LIKE CONCAT('%', #{keyword}, '%')
+                     OR dept.name LIKE CONCAT('%', #{keyword}, '%')
+                     OR doc.title LIKE CONCAT('%', #{keyword}, '%')
+                     OR doc.introduction LIKE CONCAT('%', #{keyword}, '%'))
+            </if>
+            <if test="departmentId != null">AND doc.department_id = #{departmentId}</if>
+            <if test="status != null">AND doc.status = #{status}</if>
+            <if test="departmentStatus != null">AND dept.status = #{departmentStatus}</if>
+        </where>
+    </sql>
+
+    <select id="page" resultType="com.healthy.appointment.vo.DoctorVO">
+        SELECT <include refid="doctorColumns"/>
+        FROM doctor doc
+        INNER JOIN department dept ON dept.id = doc.department_id
+        <include refid="doctorPageConditions"/>
+        ORDER BY doc.sort_order ASC, doc.id ASC
+    </select>
+
+    <select id="findById" resultType="com.healthy.doctor.model.DoctorQueryView">
+        SELECT <include refid="internalDoctorColumns"/>
+        FROM doctor doc
+        INNER JOIN department dept ON dept.id = doc.department_id
+        WHERE doc.id = #{id}
+    </select>
+
+    <select id="findEnabledByUserId" resultType="com.healthy.doctor.model.DoctorQueryView">
+        SELECT <include refid="internalDoctorColumns"/>
+        FROM doctor doc
+        INNER JOIN department dept ON dept.id = doc.department_id
+        WHERE doc.user_id = #{userId}
+          AND doc.status = 1
+        LIMIT 1
+    </select>
+
+    <select id="listByIds" resultType="com.healthy.doctor.model.DoctorQueryView">
+        SELECT <include refid="internalDoctorColumns"/>
+        FROM doctor doc
+        INNER JOIN department dept ON dept.id = doc.department_id
+        WHERE doc.id IN
+        <foreach collection="doctorIds" item="doctorId" open="(" separator="," close=")">
+            #{doctorId}
+        </foreach>
+        ORDER BY doc.id
+    </select>
+
+    <select id="findIdsByDepartment" resultType="java.lang.Long">
+        SELECT id
+        FROM doctor
+        WHERE department_id = #{departmentId}
+        ORDER BY id
+    </select>
+</mapper>

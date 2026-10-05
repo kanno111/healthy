@@ -1,14 +1,13 @@
 package com.healthy.appointment.config;
 
 import com.healthy.appointment.entity.SysUser;
+import com.healthy.appointment.security.JwtTokenSupport;
 import io.jsonwebtoken.Jwts;
 import io.jsonwebtoken.Claims;
-import io.jsonwebtoken.security.Keys;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 
 import javax.crypto.SecretKey;
-import java.nio.charset.StandardCharsets;
 import java.time.Instant;
 import java.time.Duration;
 import java.util.Date;
@@ -37,11 +36,7 @@ public class JwtTokenService {
      * 无效或已过期的令牌会由 JJWT 抛出异常，调用方统一转换为未登录错误。
      */
     public Claims parseClaims(String token) {
-        return Jwts.parser()
-                .verifyWith(signingKey())
-                .build()
-                .parseSignedClaims(token)
-                .getPayload();
+        return JwtTokenSupport.parseClaims(token, jwtProperties.getSecret());
     }
 
     public Duration remainingTtl(String token) {
@@ -52,6 +47,6 @@ public class JwtTokenService {
 
     //得到secretKey  用于
     private SecretKey signingKey() {
-        return Keys.hmacShaKeyFor(jwtProperties.getSecret().getBytes(StandardCharsets.UTF_8));
+        return JwtTokenSupport.signingKey(jwtProperties.getSecret());
     }
 }

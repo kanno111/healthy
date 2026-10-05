@@ -3,4 +3,11 @@
     <modelVersion>4.0.0</modelVersion>
     <parent><groupId>com.healthy</groupId><artifactId>healthy-backend</artifactId><version>0.0.1-SNAPSHOT</version></parent>
     <artifactId>healthy-common</artifactId>
+    <dependencies>
+        <dependency>
+            <groupId>io.jsonwebtoken</groupId>
+            <artifactId>jjwt-api</artifactId>
+            <version>0.12.6</version>
+        </dependency>
+    </dependencies>
 </project>

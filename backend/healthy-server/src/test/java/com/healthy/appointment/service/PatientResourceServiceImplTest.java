@@ -1,11 +1,12 @@
 package com.healthy.appointment.service;
 
+import com.healthy.appointment.domain.doctor.DoctorDirectory;
+import com.healthy.appointment.domain.doctor.DoctorSummary;
+import com.healthy.appointment.enumeration.ErrorCode;
 import com.healthy.appointment.exception.BusinessException;
 import com.healthy.appointment.mapper.PatientResourceMapper;
 import com.healthy.appointment.result.PageResult;
 import com.healthy.appointment.service.impl.PatientResourceServiceImpl;
-import com.healthy.appointment.vo.DepartmentVO;
-import com.healthy.appointment.vo.DoctorVO;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
@@ -25,18 +26,16 @@ import static org.mockito.Mockito.when;
 @ExtendWith(MockitoExtension.class)
 class PatientResourceServiceImplTest {
     @Mock
-    private DepartmentService departmentService;
-    @Mock
-    private DoctorService doctorService;
+    private DoctorDirectory doctorDirectory;
     @Mock
     private PatientResourceMapper patientResourceMapper;
 
     @Test
     void pageDoctorsAddsAvailabilityToCurrentPage() {
         PatientResourceService service = createService();
-        DoctorVO doctor = doctor(1L, 1);
+        DoctorSummary doctor = doctor(1L, 1);
         doctor.setName("张医生");
-        when(doctorService.pageVisible(1L, "  张医生  ", 1, 10))
+        when(doctorDirectory.pageVisibleDoctors(1L, "  张医生  ", 1, 10))
                 .thenReturn(PageResult.of(List.of(doctor), 1, 1, 10));
         LocalDate today = LocalDate.now();
         when(patientResourceMapper.listDoctorIdsWithAvailableSlots(
@@ -46,15 +45,14 @@ class PatientResourceServiceImplTest {
 
         assertThat(result.records()).hasSize(1);
         assertThat(result.total()).isEqualTo(1);
-        verify(doctorService).pageVisible(1L, "  张医生  ", 1, 10);
+        verify(doctorDirectory).pageVisibleDoctors(1L, "  张医生  ", 1, 10);
     }
 
     @Test
     void getDoctorRejectsInvisibleDoctor() {
         PatientResourceService service = createService();
-        DoctorVO doctor = doctor(1L, 0);
-        when(doctorService.getById(1L)).thenReturn(doctor);
-        when(departmentService.getById(1L)).thenReturn(enabledDepartment(1L));
+        when(doctorDirectory.requireVisibleDoctor(1L))
+                .thenThrow(new BusinessException(ErrorCode.NOT_FOUND));
 
         assertThatThrownBy(() -> service.getDoctorById(1L)).isInstanceOf(BusinessException.class);
     }
@@ -62,8 +60,7 @@ class PatientResourceServiceImplTest {
     @Test
     void listScheduleSlotsRejectsPastDate() {
         PatientResourceService service = createService();
-        when(doctorService.getById(1L)).thenReturn(doctor(1L, 1));
-        when(departmentService.getById(1L)).thenReturn(enabledDepartment(1L));
+        when(doctorDirectory.requireVisibleDoctor(1L)).thenReturn(doctor(1L, 1));
 
         assertThatThrownBy(() -> service.listScheduleSlots(1L, LocalDate.now().minusDays(1), LocalDate.now()))
                 .isInstanceOf(BusinessException.class);
@@ -74,20 +71,14 @@ class PatientResourceServiceImplTest {
     }
 
     private PatientResourceService createService() {
-        return new PatientResourceServiceImpl(departmentService, doctorService, patientResourceMapper);
+        return new PatientResourceServiceImpl(doctorDirectory, patientResourceMapper);
     }
 
-    private DepartmentVO enabledDepartment(Long id) {
-        DepartmentVO department = new DepartmentVO();
-        department.setId(id);
-        department.setStatus(1);
-        return department;
-    }
-
-    private DoctorVO doctor(Long id, Integer status) {
-        DoctorVO doctor = new DoctorVO();
+    private DoctorSummary doctor(Long id, Integer status) {
+        DoctorSummary doctor = new DoctorSummary();
         doctor.setId(id);
         doctor.setDepartmentId(1L);
+        doctor.setDepartmentStatus(1);
         doctor.setStatus(status);
         return doctor;
     }
