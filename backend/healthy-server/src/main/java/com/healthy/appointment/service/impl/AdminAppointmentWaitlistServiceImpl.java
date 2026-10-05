@@ -4,7 +4,7 @@ import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.healthy.appointment.domain.booking.BookingViewAssembler;
 import com.healthy.appointment.domain.identity.PatientDirectory;
-import com.healthy.appointment.domain.provider.ProviderDirectory;
+import com.healthy.appointment.domain.doctor.DoctorDirectory;
 import com.healthy.appointment.enumeration.ErrorCode;
 import com.healthy.appointment.exception.BusinessException;
 import com.healthy.appointment.mapper.AppointmentWaitlistMapper;
@@ -27,7 +27,7 @@ public class AdminAppointmentWaitlistServiceImpl implements AdminAppointmentWait
 
     private final AppointmentWaitlistMapper appointmentWaitlistMapper;
     private final PatientDirectory patientDirectory;
-    private final ProviderDirectory providerDirectory;
+    private final DoctorDirectory doctorDirectory;
     private final BookingViewAssembler bookingViewAssembler;
 
     @Override
@@ -71,13 +71,13 @@ public class AdminAppointmentWaitlistServiceImpl implements AdminAppointmentWait
             if (departmentId == null) {
                 return List.of(doctorId);
             }
-            Set<Long> departmentDoctorIds = providerDirectory.findDoctorIdsByDepartment(departmentId);
+            Set<Long> departmentDoctorIds = doctorDirectory.findDoctorIdsByDepartment(departmentId);
             return departmentDoctorIds.contains(doctorId) ? List.of(doctorId) : List.of();
         }
         if (departmentId == null) {
             return null;
         }
-        return providerDirectory.findDoctorIdsByDepartment(departmentId).stream().sorted().toList();
+        return doctorDirectory.findDoctorIdsByDepartment(departmentId).stream().sorted().toList();
     }
 
     private List<Long> resolvePatientIds(String patientKeyword) {

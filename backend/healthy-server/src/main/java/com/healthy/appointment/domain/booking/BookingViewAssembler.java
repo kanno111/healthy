@@ -2,8 +2,8 @@ package com.healthy.appointment.domain.booking;
 
 import com.healthy.appointment.domain.identity.PatientDirectory;
 import com.healthy.appointment.domain.identity.PatientSummary;
-import com.healthy.appointment.domain.provider.DoctorSummary;
-import com.healthy.appointment.domain.provider.ProviderDirectory;
+import com.healthy.appointment.domain.doctor.DoctorDirectory;
+import com.healthy.appointment.domain.doctor.DoctorSummary;
 import com.healthy.appointment.vo.AdminAppointmentVO;
 import com.healthy.appointment.vo.AdminAppointmentWaitlistQueueItemVO;
 import com.healthy.appointment.vo.AdminAppointmentWaitlistQueueVO;
@@ -24,19 +24,19 @@ import java.util.Objects;
 @RequiredArgsConstructor
 public class BookingViewAssembler {
     private final PatientDirectory patientDirectory;
-    private final ProviderDirectory providerDirectory;
+    private final DoctorDirectory doctorDirectory;
 
     public PatientAppointmentVO enrich(PatientAppointmentVO appointment) {
         if (appointment == null || appointment.getDoctorId() == null) {
             return appointment;
         }
-        applyDoctor(appointment, providerDirectory.findDoctorsByIds(List.of(appointment.getDoctorId()))
+        applyDoctor(appointment, doctorDirectory.findDoctorsByIds(List.of(appointment.getDoctorId()))
                 .get(appointment.getDoctorId()));
         return appointment;
     }
 
     public List<PatientAppointmentVO> enrichPatientAppointments(List<PatientAppointmentVO> appointments) {
-        Map<Long, DoctorSummary> doctors = providerDirectory.findDoctorsByIds(
+        Map<Long, DoctorSummary> doctors = doctorDirectory.findDoctorsByIds(
                 appointments.stream().map(PatientAppointmentVO::getDoctorId).filter(Objects::nonNull).distinct().toList());
         appointments.forEach(appointment -> applyDoctor(appointment, doctors.get(appointment.getDoctorId())));
         return appointments;
@@ -61,7 +61,7 @@ public class BookingViewAssembler {
     public List<AdminAppointmentVO> enrichAdminAppointments(List<AdminAppointmentVO> appointments) {
         Map<Long, PatientSummary> patients = patientDirectory.findByIds(
                 appointments.stream().map(AdminAppointmentVO::getPatientId).filter(Objects::nonNull).distinct().toList());
-        Map<Long, DoctorSummary> doctors = providerDirectory.findDoctorsByIds(
+        Map<Long, DoctorSummary> doctors = doctorDirectory.findDoctorsByIds(
                 appointments.stream().map(AdminAppointmentVO::getDoctorId).filter(Objects::nonNull).distinct().toList());
         appointments.forEach(appointment -> {
             applyPatient(appointment, patients.get(appointment.getPatientId()));
@@ -71,7 +71,7 @@ public class BookingViewAssembler {
     }
 
     public List<ScheduleSlotVO> enrichScheduleSlots(List<ScheduleSlotVO> slots) {
-        Map<Long, DoctorSummary> doctors = providerDirectory.findDoctorsByIds(
+        Map<Long, DoctorSummary> doctors = doctorDirectory.findDoctorsByIds(
                 slots.stream().map(ScheduleSlotVO::getDoctorId).filter(Objects::nonNull).distinct().toList());
         slots.forEach(slot -> {
             DoctorSummary doctor = doctors.get(slot.getDoctorId());
@@ -88,13 +88,13 @@ public class BookingViewAssembler {
         if (waitlist == null || waitlist.getDoctorId() == null) {
             return waitlist;
         }
-        applyDoctor(waitlist, providerDirectory.findDoctorsByIds(List.of(waitlist.getDoctorId()))
+        applyDoctor(waitlist, doctorDirectory.findDoctorsByIds(List.of(waitlist.getDoctorId()))
                 .get(waitlist.getDoctorId()));
         return waitlist;
     }
 
     public List<PatientAppointmentWaitlistVO> enrichPatientWaitlists(List<PatientAppointmentWaitlistVO> waitlists) {
-        Map<Long, DoctorSummary> doctors = providerDirectory.findDoctorsByIds(
+        Map<Long, DoctorSummary> doctors = doctorDirectory.findDoctorsByIds(
                 waitlists.stream().map(PatientAppointmentWaitlistVO::getDoctorId).filter(Objects::nonNull).distinct().toList());
         waitlists.forEach(waitlist -> applyDoctor(waitlist, doctors.get(waitlist.getDoctorId())));
         return waitlists;
@@ -103,7 +103,7 @@ public class BookingViewAssembler {
     public List<AdminAppointmentWaitlistVO> enrichAdminWaitlists(List<AdminAppointmentWaitlistVO> waitlists) {
         Map<Long, PatientSummary> patients = patientDirectory.findByIds(
                 waitlists.stream().map(AdminAppointmentWaitlistVO::getPatientId).filter(Objects::nonNull).distinct().toList());
-        Map<Long, DoctorSummary> doctors = providerDirectory.findDoctorsByIds(
+        Map<Long, DoctorSummary> doctors = doctorDirectory.findDoctorsByIds(
                 waitlists.stream().map(AdminAppointmentWaitlistVO::getDoctorId).filter(Objects::nonNull).distinct().toList());
         waitlists.forEach(waitlist -> {
             PatientSummary patient = patients.get(waitlist.getPatientId());
@@ -127,7 +127,7 @@ public class BookingViewAssembler {
             return null;
         }
         if (queue.getDoctorId() != null) {
-            DoctorSummary doctor = providerDirectory.findDoctorsByIds(List.of(queue.getDoctorId())).get(queue.getDoctorId());
+            DoctorSummary doctor = doctorDirectory.findDoctorsByIds(List.of(queue.getDoctorId())).get(queue.getDoctorId());
             if (doctor != null) {
                 queue.setDoctorName(doctor.getName());
                 queue.setDepartmentId(doctor.getDepartmentId());

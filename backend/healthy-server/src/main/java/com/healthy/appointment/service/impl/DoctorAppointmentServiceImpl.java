@@ -3,8 +3,8 @@ package com.healthy.appointment.service.impl;
 import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.healthy.appointment.domain.booking.BookingViewAssembler;
-import com.healthy.appointment.domain.provider.DoctorSummary;
-import com.healthy.appointment.domain.provider.ProviderDirectory;
+import com.healthy.appointment.domain.doctor.DoctorDirectory;
+import com.healthy.appointment.domain.doctor.DoctorSummary;
 import com.healthy.appointment.entity.Appointment;
 import com.healthy.appointment.enumeration.ErrorCode;
 import com.healthy.appointment.exception.BusinessException;
@@ -31,7 +31,7 @@ import java.util.Set;
 public class DoctorAppointmentServiceImpl implements DoctorAppointmentService {
     private static final Set<String> SUPPORTED_STATUSES = Set.of("BOOKED", "COMPLETED", "CANCELLED");
 
-    private final ProviderDirectory providerDirectory;
+    private final DoctorDirectory doctorDirectory;
     private final AppointmentMapper appointmentMapper;
     private final BookingViewAssembler bookingViewAssembler;
 
@@ -88,7 +88,7 @@ public class DoctorAppointmentServiceImpl implements DoctorAppointmentService {
     }
 
     private DoctorSummary requireCurrentDoctor(Long userId) {
-        return providerDirectory.requireEnabledDoctorByUserId(userId);
+        return doctorDirectory.requireEnabledDoctorByUserId(userId);
     }
 
     private String normalizeStatus(String status) {

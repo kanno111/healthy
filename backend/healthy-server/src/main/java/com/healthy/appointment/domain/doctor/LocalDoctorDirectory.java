@@ -1,4 +1,4 @@
-package com.healthy.appointment.domain.provider;
+package com.healthy.appointment.domain.doctor;
 
 import com.healthy.appointment.entity.Doctor;
 import com.healthy.appointment.enumeration.ErrorCode;
@@ -17,7 +17,7 @@ import java.util.stream.Collectors;
 
 @Component
 @RequiredArgsConstructor
-public class LocalProviderDirectory implements ProviderDirectory {
+public class LocalDoctorDirectory implements DoctorDirectory {
     private final DoctorMapper doctorMapper;
 
     @Override

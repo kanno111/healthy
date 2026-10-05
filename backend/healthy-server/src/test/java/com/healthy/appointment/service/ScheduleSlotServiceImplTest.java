@@ -2,8 +2,8 @@ package com.healthy.appointment.service;
 
 import com.healthy.appointment.dto.ScheduleBatchDTO;
 import com.healthy.appointment.domain.booking.BookingViewAssembler;
-import com.healthy.appointment.domain.provider.DoctorSummary;
-import com.healthy.appointment.domain.provider.ProviderDirectory;
+import com.healthy.appointment.domain.doctor.DoctorDirectory;
+import com.healthy.appointment.domain.doctor.DoctorSummary;
 import com.healthy.appointment.entity.DoctorScheduleSlot;
 import com.healthy.appointment.exception.BusinessException;
 import com.healthy.appointment.mapper.DoctorScheduleSlotMapper;
@@ -33,7 +33,7 @@ import static org.mockito.Mockito.when;
 @ExtendWith(MockitoExtension.class)
 class ScheduleSlotServiceImplTest {
     @Mock
-    private ProviderDirectory providerDirectory;
+    private DoctorDirectory doctorDirectory;
 
     @Mock
     private DoctorScheduleSlotMapper doctorScheduleSlotMapper;
@@ -53,7 +53,7 @@ class ScheduleSlotServiceImplTest {
     void batchCreateCreatesOneSlotForEachSession() {
         ScheduleSlotService service = createService();
         LocalDate date = LocalDate.now().plusDays(1);
-        when(providerDirectory.requireDoctor(1L)).thenReturn(enabledDoctor());
+        when(doctorDirectory.requireDoctor(1L)).thenReturn(enabledDoctor());
         when(doctorScheduleSlotMapper.findOverlappingSlots(eq(1L), any())).thenReturn(List.of());
 
         ScheduleBatchResultVO result = service.batchCreate(request(date, LocalTime.of(9, 0), LocalTime.of(12, 0)));
@@ -80,7 +80,7 @@ class ScheduleSlotServiceImplTest {
     void batchCreateRejectsExistingOverlapWithoutWritingAnything() {
         ScheduleSlotService service = createService();
         LocalDate date = LocalDate.now().plusDays(1);
-        when(providerDirectory.requireDoctor(1L)).thenReturn(enabledDoctor());
+        when(doctorDirectory.requireDoctor(1L)).thenReturn(enabledDoctor());
         when(doctorScheduleSlotMapper.findOverlappingSlots(eq(1L), any())).thenReturn(List.of(new DoctorScheduleSlot()));
 
         assertThatThrownBy(() -> service.batchCreate(request(date, LocalTime.of(9, 0), LocalTime.of(12, 0))))
@@ -96,7 +96,7 @@ class ScheduleSlotServiceImplTest {
         ScheduleBatchDTO request = request(date, LocalTime.of(9, 0), LocalTime.of(12, 0));
         request.setSessions(List.of(session(LocalTime.of(9, 0), LocalTime.of(12, 0)),
                 session(LocalTime.of(10, 0), LocalTime.of(12, 30))));
-        when(providerDirectory.requireDoctor(1L)).thenReturn(enabledDoctor());
+        when(doctorDirectory.requireDoctor(1L)).thenReturn(enabledDoctor());
 
         assertThatThrownBy(() -> service.batchCreate(request)).isInstanceOf(BusinessException.class);
 
@@ -161,7 +161,7 @@ class ScheduleSlotServiceImplTest {
 
     private ScheduleSlotService createService() {
         return new ScheduleSlotServiceImpl(
-                providerDirectory, doctorScheduleSlotMapper, appointmentStockService, bookingViewAssembler);
+                doctorDirectory, doctorScheduleSlotMapper, appointmentStockService, bookingViewAssembler);
     }
 
     private ScheduleBatchDTO request(LocalDate date, LocalTime startTime, LocalTime endTime) {

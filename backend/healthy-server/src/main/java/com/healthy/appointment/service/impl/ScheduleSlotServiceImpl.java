@@ -2,8 +2,8 @@ package com.healthy.appointment.service.impl;
 
 import com.healthy.appointment.dto.ScheduleBatchDTO;
 import com.healthy.appointment.domain.booking.BookingViewAssembler;
-import com.healthy.appointment.domain.provider.DoctorSummary;
-import com.healthy.appointment.domain.provider.ProviderDirectory;
+import com.healthy.appointment.domain.doctor.DoctorDirectory;
+import com.healthy.appointment.domain.doctor.DoctorSummary;
 import com.healthy.appointment.entity.DoctorScheduleSlot;
 import com.healthy.appointment.enumeration.ErrorCode;
 import com.healthy.appointment.enumeration.ScheduleSessionType;
@@ -37,7 +37,7 @@ import static com.healthy.appointment.constant.Constant.SCHEDULE_STATUS_OPEN;
 @Service
 @RequiredArgsConstructor
 public class ScheduleSlotServiceImpl implements ScheduleSlotService {
-    private final ProviderDirectory providerDirectory;
+    private final DoctorDirectory doctorDirectory;
     private final DoctorScheduleSlotMapper doctorScheduleSlotMapper;
     private final AppointmentStockService appointmentStockService;
     private final BookingViewAssembler bookingViewAssembler;
@@ -70,7 +70,7 @@ public class ScheduleSlotServiceImpl implements ScheduleSlotService {
     public List<ScheduleSlotVO> list(Long doctorId, LocalDate startDate, LocalDate endDate) {
         validateQueryDateRange(startDate, endDate);
         if (doctorId != null) {
-            providerDirectory.requireDoctor(doctorId);
+            doctorDirectory.requireDoctor(doctorId);
         }
         return bookingViewAssembler.enrichScheduleSlots(
                 doctorScheduleSlotMapper.list(doctorId, startDate, endDate));
@@ -117,7 +117,7 @@ public class ScheduleSlotServiceImpl implements ScheduleSlotService {
     }
 
     private void validateDoctor(Long doctorId) {
-        DoctorSummary doctor = providerDirectory.requireDoctor(doctorId);
+        DoctorSummary doctor = doctorDirectory.requireDoctor(doctorId);
         if (doctor.getStatus() != 1) {
             throw new BusinessException(ErrorCode.CONFLICT);
         }

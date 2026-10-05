@@ -74,19 +74,19 @@ GET  /api/internal/departments/{departmentId}/doctor-ids
 
 ## 6. 当前依赖点
 
-以下 booking 代码会通过当前 `ProviderDirectory` 读取医生数据：
+以下 booking 代码会通过 `DoctorDirectory` 读取医生数据：
 
 - `BookingViewAssembler`：批量装配医生和科室名称
 - `ScheduleSlotServiceImpl`：校验医生、展示排班
 - `DoctorAppointmentServiceImpl`：由登录用户定位医生身份
 - `AdminAppointmentWaitlistServiceImpl`：按科室解析医生 ID
 
-当前命名将在单独的小提交中调整：
+当前命名已经调整完成：
 
 ```text
-ProviderDirectory      -> DoctorDirectory
-LocalProviderDirectory -> LocalDoctorDirectory
-domain.provider        -> domain.doctor
+DoctorDirectory
+LocalDoctorDirectory
+domain.doctor
 ```
 
 这次重命名只调整名称，不改变 SQL、业务逻辑或接口返回。
@@ -125,7 +125,7 @@ domain.provider        -> domain.doctor
 每完成一步就停止，不连续实现下一步：
 
 1. `docs: define doctor service extraction scope`（当前步骤）
-2. `refactor: rename provider boundary to doctor directory`
+2. `refactor: rename provider boundary to doctor directory`（已完成）
 3. `feat: scaffold doctor service`
 4. `feat: add doctor service internal gateway route`
 5. `feat: move department queries to doctor service`

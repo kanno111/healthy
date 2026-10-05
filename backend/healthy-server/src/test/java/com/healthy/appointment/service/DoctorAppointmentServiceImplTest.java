@@ -3,8 +3,8 @@ package com.healthy.appointment.service;
 import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.healthy.appointment.domain.booking.BookingViewAssembler;
-import com.healthy.appointment.domain.provider.DoctorSummary;
-import com.healthy.appointment.domain.provider.ProviderDirectory;
+import com.healthy.appointment.domain.doctor.DoctorDirectory;
+import com.healthy.appointment.domain.doctor.DoctorSummary;
 import com.healthy.appointment.entity.Appointment;
 import com.healthy.appointment.exception.BusinessException;
 import com.healthy.appointment.mapper.AppointmentMapper;
@@ -29,17 +29,17 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 class DoctorAppointmentServiceImplTest {
-    private ProviderDirectory providerDirectory;
+    private DoctorDirectory doctorDirectory;
     private AppointmentMapper appointmentMapper;
     private BookingViewAssembler bookingViewAssembler;
     private DoctorAppointmentServiceImpl service;
 
     @BeforeEach
     void setUp() {
-        providerDirectory = mock(ProviderDirectory.class);
+        doctorDirectory = mock(DoctorDirectory.class);
         appointmentMapper = mock(AppointmentMapper.class);
         bookingViewAssembler = mock(BookingViewAssembler.class);
-        service = new DoctorAppointmentServiceImpl(providerDirectory, appointmentMapper, bookingViewAssembler);
+        service = new DoctorAppointmentServiceImpl(doctorDirectory, appointmentMapper, bookingViewAssembler);
     }
 
     @Test
@@ -50,7 +50,7 @@ class DoctorAppointmentServiceImplTest {
         Page<DoctorAppointmentVO> mapperPage = new Page<>(2, 10);
         mapperPage.setRecords(List.of(record));
         mapperPage.setTotal(11);
-        when(providerDirectory.requireEnabledDoctorByUserId(100L)).thenReturn(doctor);
+        when(doctorDirectory.requireEnabledDoctorByUserId(100L)).thenReturn(doctor);
         when(appointmentMapper.pageForDoctor(any(), eq(8L), eq(LocalDate.of(2026, 9, 22)), eq("BOOKED")))
                 .thenReturn(mapperPage);
 
@@ -67,7 +67,7 @@ class DoctorAppointmentServiceImplTest {
 
     @Test
     void completesOnlyBookedAppointmentOwnedByCurrentDoctor() {
-        when(providerDirectory.requireEnabledDoctorByUserId(100L)).thenReturn(doctor(8L, 100L));
+        when(doctorDirectory.requireEnabledDoctorByUserId(100L)).thenReturn(doctor(8L, 100L));
         when(appointmentMapper.completeBookedByDoctor(
                 eq(20L), eq(8L), any(LocalDate.class), any(LocalTime.class))).thenReturn(1);
 
@@ -80,7 +80,7 @@ class DoctorAppointmentServiceImplTest {
 
     @Test
     void rejectsAppointmentOwnedByAnotherDoctorWhenConditionalUpdateAffectsNoRows() {
-        when(providerDirectory.requireEnabledDoctorByUserId(100L)).thenReturn(doctor(8L, 100L));
+        when(doctorDirectory.requireEnabledDoctorByUserId(100L)).thenReturn(doctor(8L, 100L));
         when(appointmentMapper.completeBookedByDoctor(
                 eq(20L), eq(8L), any(LocalDate.class), any(LocalTime.class))).thenReturn(0);
         Appointment appointment = new Appointment();
@@ -95,7 +95,7 @@ class DoctorAppointmentServiceImplTest {
 
     @Test
     void rejectsRepeatedCompletionWhenConditionalUpdateAffectsNoRows() {
-        when(providerDirectory.requireEnabledDoctorByUserId(100L)).thenReturn(doctor(8L, 100L));
+        when(doctorDirectory.requireEnabledDoctorByUserId(100L)).thenReturn(doctor(8L, 100L));
         when(appointmentMapper.completeBookedByDoctor(
                 eq(20L), eq(8L), any(LocalDate.class), any(LocalTime.class))).thenReturn(0);
         Appointment appointment = new Appointment();
@@ -113,7 +113,7 @@ class DoctorAppointmentServiceImplTest {
 
     @Test
     void rejectsCompletingFutureAppointment() {
-        when(providerDirectory.requireEnabledDoctorByUserId(100L)).thenReturn(doctor(8L, 100L));
+        when(doctorDirectory.requireEnabledDoctorByUserId(100L)).thenReturn(doctor(8L, 100L));
         Appointment appointment = new Appointment();
         appointment.setId(20L);
         appointment.setDoctorId(8L);
@@ -131,7 +131,7 @@ class DoctorAppointmentServiceImplTest {
 
     @Test
     void rejectsAccountWithoutBoundDoctorProfile() {
-        when(providerDirectory.requireEnabledDoctorByUserId(100L)).thenThrow(new BusinessException(com.healthy.appointment.enumeration.ErrorCode.FORBIDDEN));
+        when(doctorDirectory.requireEnabledDoctorByUserId(100L)).thenThrow(new BusinessException(com.healthy.appointment.enumeration.ErrorCode.FORBIDDEN));
 
         assertThatThrownBy(() -> service.pageMine(100L, null, null, 1, 10))
                 .isInstanceOf(BusinessException.class);

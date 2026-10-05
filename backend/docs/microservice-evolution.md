@@ -34,7 +34,7 @@ Spring Cloud OpenFeign、Nacos Discovery/Config 与 Sentinel 已接入 `healthy-
 
 `PatientDirectory` 是 booking 访问 identity 数据的端口，当前由 `LocalPatientDirectory` 通过本地 Mapper 实现。未来抽出 identity-service 时，只需增加基于 OpenFeign 的远程适配器，并替换 Spring Bean。
 
-`ProviderDirectory` 是 booking 访问医生和科室数据的现有端口，当前由 `LocalProviderDirectory` 实现。后续先在独立提交中将它们改名为 `DoctorDirectory`、`LocalDoctorDirectory`，再抽出 doctor-service 并增加 Feign 适配器。
+`DoctorDirectory` 是 booking 访问医生和科室数据的端口，当前由 `LocalDoctorDirectory` 实现。未来抽出 doctor-service 时，只需增加 Feign 适配器并替换 Spring Bean。
 
 `BookingViewAssembler` 根据 booking 查询返回的 `patientId`、`doctorId` 做批量查询并装配名称，避免逐条远程调用造成 N+1。预约和候补 Mapper 不再 JOIN identity/doctor-service 表；`MapperDomainBoundaryTest` 会防止跨域 JOIN 被重新引入。
 
@@ -61,7 +61,7 @@ Vue / Nginx
 ## 下一次真正抽服务的顺序
 
 1. 先抽 doctor-service（模块名与 Nacos 服务名为 `healthy-doctor`）。它以查询和基础资料 CRUD 为主，对预约写事务影响最小。
-2. 将当前 `LocalProviderDirectory` 改名并最终替换为 Feign 适配器，保持批量接口，不允许循环远程调用。
+2. 将当前 `LocalDoctorDirectory` 替换为 Feign 适配器，保持批量接口，不允许循环远程调用。
 3. 再抽 identity-service；认证可先留在原服务，稳定后再把登录与 Redis 会话迁走。
 4. 最后把剩余项目重命名为 booking-service。Outbox、RabbitMQ 和候补补偿整体保留在 booking 内部。
 5. 服务各自拥有数据库 schema 和 Flyway 迁移。跨服务只保存 ID，不建立数据库外键，也不跨库 JOIN。

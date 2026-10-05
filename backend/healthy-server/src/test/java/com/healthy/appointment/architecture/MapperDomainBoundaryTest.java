@@ -24,7 +24,7 @@ class MapperDomainBoundaryTest {
         for (String mapper : bookingMappers) {
             String sql = new ClassPathResource(mapper).getContentAsString(StandardCharsets.UTF_8);
             assertThat(CROSS_DOMAIN_JOIN.matcher(sql).find())
-                    .as("%s must obtain identity/provider data through domain ports", mapper)
+                    .as("%s must obtain identity/doctor data through domain ports", mapper)
                     .isFalse();
         }
     }

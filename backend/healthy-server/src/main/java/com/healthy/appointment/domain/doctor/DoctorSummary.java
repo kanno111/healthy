@@ -1,4 +1,4 @@
-package com.healthy.appointment.domain.provider;
+package com.healthy.appointment.domain.doctor;
 
 import lombok.Data;
 
