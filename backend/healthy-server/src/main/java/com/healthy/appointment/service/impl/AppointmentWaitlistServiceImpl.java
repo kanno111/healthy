@@ -3,17 +3,17 @@ package com.healthy.appointment.service.impl;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 import com.healthy.appointment.config.AppointmentWaitlistProperties;
+import com.healthy.appointment.domain.booking.BookingViewAssembler;
+import com.healthy.appointment.domain.identity.PatientDirectory;
 import com.healthy.appointment.dto.AppointmentWaitlistCreateDTO;
 import com.healthy.appointment.entity.Appointment;
 import com.healthy.appointment.entity.AppointmentWaitlist;
 import com.healthy.appointment.entity.DoctorScheduleSlot;
-import com.healthy.appointment.entity.Patient;
 import com.healthy.appointment.enumeration.ErrorCode;
 import com.healthy.appointment.exception.BusinessException;
 import com.healthy.appointment.mapper.AppointmentMapper;
 import com.healthy.appointment.mapper.AppointmentWaitlistMapper;
 import com.healthy.appointment.mapper.DoctorScheduleSlotMapper;
-import com.healthy.appointment.mapper.PatientMapper;
 import com.healthy.appointment.service.AppointmentWaitlistService;
 import com.healthy.appointment.service.AppointmentStockService;
 import com.healthy.appointment.service.OutboxMessageService;
@@ -42,13 +42,14 @@ import static com.healthy.appointment.constant.Constant.WAITLIST_STATUS_WAITING;
 @Slf4j
 @RequiredArgsConstructor
 public class AppointmentWaitlistServiceImpl implements AppointmentWaitlistService {
-    private final PatientMapper patientMapper;
+    private final PatientDirectory patientDirectory;
     private final DoctorScheduleSlotMapper doctorScheduleSlotMapper;
     private final AppointmentMapper appointmentMapper;
     private final AppointmentWaitlistMapper appointmentWaitlistMapper;
     private final AppointmentStockService appointmentStockService;
     private final AppointmentWaitlistProperties appointmentWaitlistProperties;
     private final OutboxMessageService outboxMessageService;
+    private final BookingViewAssembler bookingViewAssembler;
 
     @Override
     @Transactional(rollbackFor = Exception.class)
@@ -70,7 +71,8 @@ public class AppointmentWaitlistServiceImpl implements AppointmentWaitlistServic
 
         AppointmentWaitlist existing = findActiveWaitlist(patientId, slotId);
         if (existing != null) {
-            return appointmentWaitlistMapper.findByIdAndPatientId(existing.getId(), patientId);
+            return bookingViewAssembler.enrich(
+                    appointmentWaitlistMapper.findByIdAndPatientId(existing.getId(), patientId));
         }
 
         AppointmentWaitlist waitlist = new AppointmentWaitlist();
@@ -84,7 +86,8 @@ public class AppointmentWaitlistServiceImpl implements AppointmentWaitlistServic
         } catch (DuplicateKeyException exception) {
             AppointmentWaitlist concurrentExisting = findActiveWaitlist(patientId, slotId);
             if (concurrentExisting != null) {
-                return appointmentWaitlistMapper.findByIdAndPatientId(concurrentExisting.getId(), patientId);
+                return bookingViewAssembler.enrich(
+                        appointmentWaitlistMapper.findByIdAndPatientId(concurrentExisting.getId(), patientId));
             }
             throw new BusinessException(ErrorCode.CONFLICT);
         }
@@ -93,13 +96,13 @@ public class AppointmentWaitlistServiceImpl implements AppointmentWaitlistServic
         runAfterCommit(() -> log.info(
                 "Joined appointment waitlist successfully: waitlistId={}, patientId={}, slotId={}, oldStatus={}, newStatus={}, offerExpireTime={}",
                 waitlist.getId(), patientId, slotId, null, WAITLIST_STATUS_WAITING, null));
-        return result;
+        return bookingViewAssembler.enrich(result);
     }
 
     @Override
     public List<PatientAppointmentWaitlistVO> listMyWaitlists(Long userId) {
         Long patientId = findEnabledPatientId(userId);
-        return appointmentWaitlistMapper.listByPatientId(patientId);
+        return bookingViewAssembler.enrichPatientWaitlists(appointmentWaitlistMapper.listByPatientId(patientId));
     }
 
     @Override
@@ -313,15 +316,7 @@ public class AppointmentWaitlistServiceImpl implements AppointmentWaitlistServic
     }
 
     private Long findEnabledPatientId(Long userId) {
-        Patient patient = patientMapper.selectOne(new LambdaQueryWrapper<>(Patient.class)
-                .select(Patient::getId)
-                .eq(Patient::getUserId, userId)
-                .eq(Patient::getStatus, 1)
-                .last("LIMIT 1"));
-        if (patient == null) {
-            throw new BusinessException(ErrorCode.NOT_FOUND);
-        }
-        return patient.getId();
+        return patientDirectory.requireEnabledPatientIdByUserId(userId);
     }
 
     private void runAfterCommit(Runnable action) {

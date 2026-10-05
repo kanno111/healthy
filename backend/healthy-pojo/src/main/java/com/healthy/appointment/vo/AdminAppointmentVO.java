@@ -11,8 +11,11 @@ import java.time.LocalTime;
 public class AdminAppointmentVO {
     private Long id;
     private String appointmentNo;
+    private Long patientId;
+    private Long doctorId;
     private String patientName;
     private String doctorName;
+    private Long departmentId;
     private String departmentName;
     private LocalDate scheduleDate;
     private String sessionName;

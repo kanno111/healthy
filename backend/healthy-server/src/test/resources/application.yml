@@ -1,4 +1,12 @@
 spring:
+  cloud:
+    nacos:
+      discovery:
+        enabled: false
+      config:
+        enabled: false
+    sentinel:
+      enabled: false
   profiles:
     default: local
   flyway:

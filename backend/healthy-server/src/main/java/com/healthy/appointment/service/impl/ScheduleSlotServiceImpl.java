@@ -1,15 +1,16 @@
 package com.healthy.appointment.service.impl;
 
 import com.healthy.appointment.dto.ScheduleBatchDTO;
+import com.healthy.appointment.domain.booking.BookingViewAssembler;
+import com.healthy.appointment.domain.provider.DoctorSummary;
+import com.healthy.appointment.domain.provider.ProviderDirectory;
 import com.healthy.appointment.entity.DoctorScheduleSlot;
 import com.healthy.appointment.enumeration.ErrorCode;
 import com.healthy.appointment.enumeration.ScheduleSessionType;
 import com.healthy.appointment.exception.BusinessException;
 import com.healthy.appointment.mapper.DoctorScheduleSlotMapper;
 import com.healthy.appointment.service.AppointmentStockService;
-import com.healthy.appointment.service.DoctorService;
 import com.healthy.appointment.service.ScheduleSlotService;
-import com.healthy.appointment.vo.DoctorVO;
 import com.healthy.appointment.vo.ScheduleBatchResultVO;
 import com.healthy.appointment.vo.ScheduleSlotVO;
 import lombok.RequiredArgsConstructor;
@@ -36,9 +37,10 @@ import static com.healthy.appointment.constant.Constant.SCHEDULE_STATUS_OPEN;
 @Service
 @RequiredArgsConstructor
 public class ScheduleSlotServiceImpl implements ScheduleSlotService {
-    private final DoctorService doctorService;
+    private final ProviderDirectory providerDirectory;
     private final DoctorScheduleSlotMapper doctorScheduleSlotMapper;
     private final AppointmentStockService appointmentStockService;
+    private final BookingViewAssembler bookingViewAssembler;
 
     /**
      * 先完整校验本次请求和既有排班，再一次性入库，避免批量请求只成功一部分。
@@ -59,16 +61,19 @@ public class ScheduleSlotServiceImpl implements ScheduleSlotService {
         doctorScheduleSlotMapper.batchInsert(slots);
         runAfterCommit(() -> slots.forEach(slot ->
                 appointmentStockService.initialize(slot.getId(), slot.getRemainingCapacity())));
-        return new ScheduleBatchResultVO(slots.size(), slots.stream().map(this::toVO).toList());
+        List<ScheduleSlotVO> createdSlots = slots.stream().map(this::toVO).toList();
+        bookingViewAssembler.enrichScheduleSlots(createdSlots);
+        return new ScheduleBatchResultVO(slots.size(), createdSlots);
     }
 
     @Override
     public List<ScheduleSlotVO> list(Long doctorId, LocalDate startDate, LocalDate endDate) {
         validateQueryDateRange(startDate, endDate);
         if (doctorId != null) {
-            doctorService.getById(doctorId);
+            providerDirectory.requireDoctor(doctorId);
         }
-        return doctorScheduleSlotMapper.list(doctorId, startDate, endDate);
+        return bookingViewAssembler.enrichScheduleSlots(
+                doctorScheduleSlotMapper.list(doctorId, startDate, endDate));
     }
 
     @Override
@@ -112,7 +117,7 @@ public class ScheduleSlotServiceImpl implements ScheduleSlotService {
     }
 
     private void validateDoctor(Long doctorId) {
-        DoctorVO doctor = doctorService.getById(doctorId);
+        DoctorSummary doctor = providerDirectory.requireDoctor(doctorId);
         if (doctor.getStatus() != 1) {
             throw new BusinessException(ErrorCode.CONFLICT);
         }

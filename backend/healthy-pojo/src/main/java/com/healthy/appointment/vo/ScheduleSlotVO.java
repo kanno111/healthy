@@ -10,6 +10,7 @@ public class ScheduleSlotVO {
     private Long id;
     private Long doctorId;
     private String doctorName;
+    private Long departmentId;
     private String departmentName;
     private LocalDate scheduleDate;
     private String sessionType;

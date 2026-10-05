@@ -15,8 +15,6 @@ import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
-import java.time.LocalDate;
-import java.time.LocalTime;
 import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -86,8 +84,7 @@ class DoctorServiceImplTest {
         Page<DoctorVO> resultPage = new Page<>(2, 10);
         resultPage.setTotal(21L);
         resultPage.setRecords(List.of(doctor));
-        when(doctorMapper.page(any(IPage.class), eq("Zhang"), isNull(), eq(1L), eq(1), isNull(),
-                eq(false), isNull(), isNull(), isNull()))
+        when(doctorMapper.page(any(IPage.class), eq("Zhang"), isNull(), eq(1L), eq(1), isNull()))
                 .thenReturn(resultPage);
 
         var result = service.page(" Zhang ", 1L, 1, 2, 10);
@@ -101,14 +98,12 @@ class DoctorServiceImplTest {
     @Test
     void pageVisibleRestrictsDoctorAndDepartmentStatus() {
         DoctorService service = new DoctorServiceImpl(doctorMapper, departmentService);
-        when(doctorMapper.page(any(IPage.class), isNull(), eq("cardiology"), eq(1L), eq(1), eq(1),
-                eq(true), any(LocalDate.class), any(LocalDate.class), any(LocalTime.class)))
+        when(doctorMapper.page(any(IPage.class), isNull(), eq("cardiology"), eq(1L), eq(1), eq(1)))
                 .thenReturn(new Page<>(1, 10));
 
         service.pageVisible(1L, " cardiology ", 1, 10);
 
-        verify(doctorMapper).page(any(IPage.class), isNull(), eq("cardiology"), eq(1L), eq(1), eq(1),
-                eq(true), any(LocalDate.class), any(LocalDate.class), any(LocalTime.class));
+        verify(doctorMapper).page(any(IPage.class), isNull(), eq("cardiology"), eq(1L), eq(1), eq(1));
     }
 
     private DoctorSaveDTO request() {

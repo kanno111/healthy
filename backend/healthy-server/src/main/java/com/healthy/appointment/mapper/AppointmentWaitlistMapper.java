@@ -33,9 +33,8 @@ public interface AppointmentWaitlistMapper extends BaseMapper<AppointmentWaitlis
             @Param("page") IPage<AdminAppointmentWaitlistVO> page,
             @Param("status") String status,
             @Param("scheduleDate") LocalDate scheduleDate,
-            @Param("departmentId") Long departmentId,
-            @Param("doctorId") Long doctorId,
-            @Param("patientKeyword") String patientKeyword);
+            @Param("doctorIds") List<Long> doctorIds,
+            @Param("patientIds") List<Long> patientIds);
 
     AdminAppointmentWaitlistQueueVO findQueueSummary(@Param("scheduleSlotId") Long scheduleSlotId);
 

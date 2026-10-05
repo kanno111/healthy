@@ -2,12 +2,13 @@ package com.healthy.appointment.service.impl;
 
 import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
+import com.healthy.appointment.domain.booking.BookingViewAssembler;
+import com.healthy.appointment.domain.provider.DoctorSummary;
+import com.healthy.appointment.domain.provider.ProviderDirectory;
 import com.healthy.appointment.entity.Appointment;
-import com.healthy.appointment.entity.Doctor;
 import com.healthy.appointment.enumeration.ErrorCode;
 import com.healthy.appointment.exception.BusinessException;
 import com.healthy.appointment.mapper.AppointmentMapper;
-import com.healthy.appointment.mapper.DoctorMapper;
 import com.healthy.appointment.result.PageResult;
 import com.healthy.appointment.service.DoctorAppointmentService;
 import com.healthy.appointment.vo.DoctorAppointmentVO;
@@ -30,8 +31,9 @@ import java.util.Set;
 public class DoctorAppointmentServiceImpl implements DoctorAppointmentService {
     private static final Set<String> SUPPORTED_STATUSES = Set.of("BOOKED", "COMPLETED", "CANCELLED");
 
-    private final DoctorMapper doctorMapper;
+    private final ProviderDirectory providerDirectory;
     private final AppointmentMapper appointmentMapper;
+    private final BookingViewAssembler bookingViewAssembler;
 
     @Override
     public PageResult<DoctorAppointmentVO> pageMine(
@@ -40,9 +42,10 @@ public class DoctorAppointmentServiceImpl implements DoctorAppointmentService {
         LocalDate effectiveDate = scheduleDate == null ? LocalDate.now() : scheduleDate;
         String normalizedStatus = normalizeStatus(status);
         try {
-            Doctor doctor = requireCurrentDoctor(userId);
+            DoctorSummary doctor = requireCurrentDoctor(userId);
             IPage<DoctorAppointmentVO> result = appointmentMapper.pageForDoctor(
                     new Page<>(page, pageSize), doctor.getId(), effectiveDate, normalizedStatus);
+            bookingViewAssembler.enrichDoctorAppointments(result.getRecords(), doctor);
             log.info("Doctor queried own appointments: userId={}, doctorId={}, scheduleDate={}, status={}, page={}, pageSize={}, total={}",
                     userId, doctor.getId(), effectiveDate, normalizedStatus, page, pageSize, result.getTotal());
             return PageResult.of(result.getRecords(), result.getTotal(), page, pageSize);
@@ -57,7 +60,7 @@ public class DoctorAppointmentServiceImpl implements DoctorAppointmentService {
     @Transactional(rollbackFor = Exception.class)
     public void complete(Long userId, Long appointmentId) {
         try {
-            Doctor doctor = requireCurrentDoctor(userId);
+            DoctorSummary doctor = requireCurrentDoctor(userId);
             LocalDateTime now = LocalDateTime.now();
             int affectedRows = appointmentMapper.completeBookedByDoctor(
                     appointmentId, doctor.getId(), now.toLocalDate(), now.toLocalTime());
@@ -84,12 +87,8 @@ public class DoctorAppointmentServiceImpl implements DoctorAppointmentService {
         }
     }
 
-    private Doctor requireCurrentDoctor(Long userId) {
-        Doctor doctor = doctorMapper.findEnabledByUserId(userId);
-        if (doctor == null) {
-            throw new BusinessException(ErrorCode.FORBIDDEN);
-        }
-        return doctor;
+    private DoctorSummary requireCurrentDoctor(Long userId) {
+        return providerDirectory.requireEnabledDoctorByUserId(userId);
     }
 
     private String normalizeStatus(String status) {

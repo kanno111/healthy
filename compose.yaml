@@ -30,6 +30,9 @@ services:
     environment:
       TZ: ${TZ:-Asia/Shanghai}
       SPRING_PROFILES_ACTIVE: prod
+      # Keep the legacy all-in-one deployment on its existing internal port.
+      # Local microservice development runs healthy-server on 8081 behind Gateway.
+      SERVER_PORT: 8080
       DB_HOST: mysql
       DB_PORT: 3306
       DB_NAME: ${DB_NAME}

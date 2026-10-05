@@ -1,6 +1,21 @@
 spring:
   application:
-    name: appointment-api
+    name: healthy-server
+  config:
+    import:
+      - optional:nacos:${spring.application.name}.yaml?group=${NACOS_CONFIG_GROUP:DEFAULT_GROUP}&refreshEnabled=true
+  cloud:
+    nacos:
+      server-addr: ${NACOS_SERVER_ADDR:127.0.0.1:8848}
+      username: ${NACOS_USERNAME:}
+      password: ${NACOS_PASSWORD:}
+      discovery:
+        group: ${NACOS_DISCOVERY_GROUP:DEFAULT_GROUP}
+    sentinel:
+      enabled: true
+      eager: true
+      transport:
+        dashboard: ${SENTINEL_DASHBOARD:127.0.0.1:8858}
   profiles:
     default: local
   flyway:
@@ -34,7 +49,7 @@ spring:
           multiplier: 2
           max-interval: 2s
 server:
-  port: ${SERVER_PORT:8080}
+  port: ${SERVER_PORT:8081}
   servlet:
     context-path: /api
   mapper-locations: classpath*:mapper/**/*.xml
@@ -82,3 +97,9 @@ appointment:
     offer-duration: 10s
     offer-expire-check-delay: 2m
     recovery-batch-size: 100
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,sentinel

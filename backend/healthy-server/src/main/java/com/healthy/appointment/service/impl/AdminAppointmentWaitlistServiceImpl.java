@@ -2,6 +2,9 @@ package com.healthy.appointment.service.impl;
 
 import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
+import com.healthy.appointment.domain.booking.BookingViewAssembler;
+import com.healthy.appointment.domain.identity.PatientDirectory;
+import com.healthy.appointment.domain.provider.ProviderDirectory;
 import com.healthy.appointment.enumeration.ErrorCode;
 import com.healthy.appointment.exception.BusinessException;
 import com.healthy.appointment.mapper.AppointmentWaitlistMapper;
@@ -13,6 +16,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
 import java.time.LocalDate;
+import java.util.List;
 import java.util.Set;
 
 @Service
@@ -22,6 +26,9 @@ public class AdminAppointmentWaitlistServiceImpl implements AdminAppointmentWait
             "WAITING", "OFFERED", "CONFIRMED", "EXPIRED", "CANCELLED");
 
     private final AppointmentWaitlistMapper appointmentWaitlistMapper;
+    private final PatientDirectory patientDirectory;
+    private final ProviderDirectory providerDirectory;
+    private final BookingViewAssembler bookingViewAssembler;
 
     @Override
     public PageResult<AdminAppointmentWaitlistVO> page(
@@ -34,9 +41,17 @@ public class AdminAppointmentWaitlistServiceImpl implements AdminAppointmentWait
         if (normalizedStatus != null && !SUPPORTED_STATUSES.contains(normalizedStatus)) {
             throw new BusinessException(ErrorCode.VALIDATION_ERROR);
         }
+        List<Long> doctorIds = resolveDoctorIds(departmentId, doctorId);
+        if (doctorIds != null && doctorIds.isEmpty()) {
+            return PageResult.of(List.of(), 0, page, pageSize);
+        }
+        List<Long> patientIds = resolvePatientIds(patientKeyword);
+        if (patientIds != null && patientIds.isEmpty()) {
+            return PageResult.of(List.of(), 0, page, pageSize);
+        }
         IPage<AdminAppointmentWaitlistVO> result = appointmentWaitlistMapper.pageForAdmin(
-                new Page<>(page, pageSize), normalizedStatus, scheduleDate, departmentId, doctorId,
-                blankToNull(patientKeyword));
+                new Page<>(page, pageSize), normalizedStatus, scheduleDate, doctorIds, patientIds);
+        bookingViewAssembler.enrichAdminWaitlists(result.getRecords());
         return PageResult.of(result.getRecords(), result.getTotal(), page, pageSize);
     }
 
@@ -48,7 +63,29 @@ public class AdminAppointmentWaitlistServiceImpl implements AdminAppointmentWait
         }
         queue.setOfferedCandidates(appointmentWaitlistMapper.listOfferedCandidates(scheduleSlotId));
         queue.setWaitingCandidates(appointmentWaitlistMapper.listWaitingCandidates(scheduleSlotId));
-        return queue;
+        return bookingViewAssembler.enrichQueue(queue);
+    }
+
+    private List<Long> resolveDoctorIds(Long departmentId, Long doctorId) {
+        if (doctorId != null) {
+            if (departmentId == null) {
+                return List.of(doctorId);
+            }
+            Set<Long> departmentDoctorIds = providerDirectory.findDoctorIdsByDepartment(departmentId);
+            return departmentDoctorIds.contains(doctorId) ? List.of(doctorId) : List.of();
+        }
+        if (departmentId == null) {
+            return null;
+        }
+        return providerDirectory.findDoctorIdsByDepartment(departmentId).stream().sorted().toList();
+    }
+
+    private List<Long> resolvePatientIds(String patientKeyword) {
+        String normalizedKeyword = blankToNull(patientKeyword);
+        if (normalizedKeyword == null) {
+            return null;
+        }
+        return patientDirectory.findIdsByKeyword(normalizedKeyword).stream().sorted().toList();
     }
 
     private String blankToNull(String value) {

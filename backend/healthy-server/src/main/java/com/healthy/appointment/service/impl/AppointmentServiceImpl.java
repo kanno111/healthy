@@ -1,17 +1,16 @@
 package com.healthy.appointment.service.impl;
 
-import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
+import com.healthy.appointment.domain.booking.BookingViewAssembler;
+import com.healthy.appointment.domain.identity.PatientDirectory;
 import com.healthy.appointment.dto.AppointmentCreateDTO;
 import com.healthy.appointment.entity.Appointment;
 import com.healthy.appointment.entity.DoctorScheduleSlot;
-import com.healthy.appointment.entity.Patient;
 import com.healthy.appointment.enumeration.ErrorCode;
 import com.healthy.appointment.exception.BusinessException;
 import com.healthy.appointment.mapper.AppointmentMapper;
 import com.healthy.appointment.mapper.DoctorScheduleSlotMapper;
-import com.healthy.appointment.mapper.PatientMapper;
 import com.healthy.appointment.result.PageResult;
 import com.healthy.appointment.service.AppointmentService;
 import com.healthy.appointment.service.AppointmentStockService;
@@ -42,12 +41,13 @@ import static com.healthy.appointment.service.AppointmentStockService.PreDeductR
 @Slf4j
 @RequiredArgsConstructor
 public class AppointmentServiceImpl implements AppointmentService {
-    private final PatientMapper patientMapper;
+    private final PatientDirectory patientDirectory;
     private final DoctorScheduleSlotMapper doctorScheduleSlotMapper;
     private final AppointmentMapper appointmentMapper;
     private final AppointmentStockService appointmentStockService;
     private final AppointmentStockRepairService appointmentStockRepairService;
     private final AppointmentWaitlistService appointmentWaitlistService;
+    private final BookingViewAssembler bookingViewAssembler;
 
 
     /** 创建最小预约记录，并同步扣减对应班次的剩余号源。 */
@@ -58,13 +58,13 @@ public class AppointmentServiceImpl implements AppointmentService {
         PatientAppointmentVO existingByRequest = appointmentMapper.findByRequestIdAndPatientId(
                 appointmentCreateDTO.getRequestId(), patientId);
         if (existingByRequest != null) {
-            return existingByRequest;
+            return bookingViewAssembler.enrich(existingByRequest);
         }
         Long slotId = appointmentCreateDTO.getScheduleSlotId();
         PatientAppointmentVO existingActiveAppointment = appointmentMapper
                 .findActiveByPatientIdAndScheduleSlotId(patientId, slotId);
         if (existingActiveAppointment != null) {
-            return existingActiveAppointment;
+            return bookingViewAssembler.enrich(existingActiveAppointment);
         }
         if (preDeductWithReload(slotId) != SUCCESS) {
             appointmentStockRepairService.triggerIfEmpty(slotId);
@@ -112,13 +112,14 @@ public class AppointmentServiceImpl implements AppointmentService {
         logAfterCommit(() -> log.info(
                 "Appointment booked successfully: appointmentId={}, patientId={}, slotId={}",
                 appointment.getId(), patientId, slotId));
-        return result;
+        return bookingViewAssembler.enrich(result);
     }
 
     /** 查询当前登录患者的预约记录，最新创建的记录排在最前。 */
     @Override
     public List<PatientAppointmentVO> listMyAppointments(Long userId) {
-        return appointmentMapper.listByPatientId(findEnabledPatientId(userId));
+        return bookingViewAssembler.enrichPatientAppointments(
+                appointmentMapper.listByPatientId(findEnabledPatientId(userId)));
     }
 
     @Override
@@ -171,19 +172,12 @@ public class AppointmentServiceImpl implements AppointmentService {
     public PageResult<AdminAppointmentVO> pageForAdmin(int page, int pageSize) {
         validatePage(page, pageSize);
         IPage<AdminAppointmentVO> result = appointmentMapper.pageForAdmin(new Page<>(page, pageSize));
+        bookingViewAssembler.enrichAdminAppointments(result.getRecords());
         return PageResult.of(result.getRecords(), result.getTotal(), page, pageSize);
     }
 
     private Long findEnabledPatientId(Long userId) {
-        Patient patient = patientMapper.selectOne(new LambdaQueryWrapper<>(Patient.class)
-                .select(Patient::getId)
-                .eq(Patient::getUserId, userId)
-                .eq(Patient::getStatus, 1)
-                .last("LIMIT 1"));
-        if (patient == null) {
-            throw new BusinessException(ErrorCode.NOT_FOUND);
-        }
-        return patient.getId();
+        return patientDirectory.requireEnabledPatientIdByUserId(userId);
     }
 
     private DoctorScheduleSlot getAvailableSlot(Long slotId) {

@@ -2,19 +2,20 @@ package com.healthy.appointment.service;
 
 import com.healthy.appointment.dto.AppointmentWaitlistCreateDTO;
 import com.healthy.appointment.config.AppointmentWaitlistProperties;
+import com.healthy.appointment.domain.booking.BookingViewAssembler;
+import com.healthy.appointment.domain.identity.PatientDirectory;
 import com.healthy.appointment.entity.Appointment;
 import com.healthy.appointment.entity.AppointmentWaitlist;
 import com.healthy.appointment.entity.DoctorScheduleSlot;
-import com.healthy.appointment.entity.Patient;
 import com.healthy.appointment.exception.BusinessException;
 import com.healthy.appointment.mapper.AppointmentMapper;
 import com.healthy.appointment.mapper.AppointmentWaitlistMapper;
 import com.healthy.appointment.mapper.DoctorScheduleSlotMapper;
-import com.healthy.appointment.mapper.PatientMapper;
 import com.healthy.appointment.service.impl.AppointmentWaitlistServiceImpl;
 import com.healthy.appointment.vo.PatientAppointmentWaitlistVO;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.BeforeAll;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
@@ -39,11 +40,11 @@ import static org.mockito.Mockito.when;
 class AppointmentWaitlistServiceImplTest {
     @BeforeAll
     static void initializeMybatisPlusMetadata() {
-        MybatisPlusTestHelper.initializeTableInfo(Patient.class, AppointmentWaitlist.class);
+        MybatisPlusTestHelper.initializeTableInfo(AppointmentWaitlist.class);
     }
 
     @Mock
-    private PatientMapper patientMapper;
+    private PatientDirectory patientDirectory;
     @Mock
     private DoctorScheduleSlotMapper doctorScheduleSlotMapper;
     @Mock
@@ -54,13 +55,21 @@ class AppointmentWaitlistServiceImplTest {
     private AppointmentStockService appointmentStockService;
     @Mock
     private OutboxMessageService outboxMessageService;
+    @Mock
+    private BookingViewAssembler bookingViewAssembler;
+
+    @BeforeEach
+    void preserveMapperViewsInUnitTests() {
+        org.mockito.Mockito.lenient().when(bookingViewAssembler.enrich(any(PatientAppointmentWaitlistVO.class)))
+                .thenAnswer(invocation -> invocation.getArgument(0));
+    }
 
     @Test
     void joinCreatesWaitingRecordForFullOpenFutureSlot() {
         AppointmentWaitlistService service = createService();
         AppointmentWaitlist saved = waitlist(20L);
 
-        when(patientMapper.selectOne(any())).thenReturn(enabledPatient(5L));
+        when(patientDirectory.requireEnabledPatientIdByUserId(1L)).thenReturn(5L);
         when(doctorScheduleSlotMapper.findByIdForUpdate(10L)).thenReturn(fullOpenFutureSlot(10L));
         when(appointmentWaitlistMapper.selectOne(any())).thenReturn(null, saved);
         when(appointmentWaitlistMapper.findByIdAndPatientId(20L, 5L)).thenReturn(waitlistVO(20L));
@@ -87,7 +96,7 @@ class AppointmentWaitlistServiceImplTest {
         AppointmentWaitlistService service = createService();
         AppointmentWaitlist existing = waitlist(20L);
 
-        when(patientMapper.selectOne(any())).thenReturn(enabledPatient(5L));
+        when(patientDirectory.requireEnabledPatientIdByUserId(1L)).thenReturn(5L);
         when(doctorScheduleSlotMapper.findByIdForUpdate(10L)).thenReturn(fullOpenFutureSlot(10L));
         when(appointmentWaitlistMapper.selectOne(any())).thenReturn(existing);
         when(appointmentWaitlistMapper.findByIdAndPatientId(20L, 5L)).thenReturn(waitlistVO(20L));
@@ -102,7 +111,7 @@ class AppointmentWaitlistServiceImplTest {
         AppointmentWaitlistService service = createService();
         AppointmentWaitlist existing = waitlist(20L);
 
-        when(patientMapper.selectOne(any())).thenReturn(enabledPatient(5L));
+        when(patientDirectory.requireEnabledPatientIdByUserId(1L)).thenReturn(5L);
         when(doctorScheduleSlotMapper.findByIdForUpdate(10L)).thenReturn(fullOpenFutureSlot(10L));
         when(appointmentWaitlistMapper.selectOne(any())).thenReturn(null, existing);
         when(appointmentWaitlistMapper.findByIdAndPatientId(20L, 5L)).thenReturn(waitlistVO(20L));
@@ -116,7 +125,7 @@ class AppointmentWaitlistServiceImplTest {
         AppointmentWaitlistService service = createService();
         DoctorScheduleSlot slot = fullOpenFutureSlot(10L);
         slot.setRemainingCapacity(1);
-        when(patientMapper.selectOne(any())).thenReturn(enabledPatient(5L));
+        when(patientDirectory.requireEnabledPatientIdByUserId(1L)).thenReturn(5L);
         when(doctorScheduleSlotMapper.findByIdForUpdate(10L)).thenReturn(slot);
 
         assertThatThrownBy(() -> service.join(1L, request(10L))).isInstanceOf(BusinessException.class);
@@ -127,7 +136,7 @@ class AppointmentWaitlistServiceImplTest {
     @Test
     void joinRejectsPatientWithBookedAppointmentForTheSameSlot() {
         AppointmentWaitlistService service = createService();
-        when(patientMapper.selectOne(any())).thenReturn(enabledPatient(5L));
+        when(patientDirectory.requireEnabledPatientIdByUserId(1L)).thenReturn(5L);
         when(doctorScheduleSlotMapper.findByIdForUpdate(10L)).thenReturn(fullOpenFutureSlot(10L));
         when(appointmentMapper.findActiveByPatientIdAndScheduleSlotId(5L, 10L))
                 .thenReturn(new com.healthy.appointment.vo.PatientAppointmentVO());
@@ -140,7 +149,7 @@ class AppointmentWaitlistServiceImplTest {
     @Test
     void cancelChangesOnlyWaitingWaitlistToCancelled() {
         AppointmentWaitlistService service = createService();
-        when(patientMapper.selectOne(any())).thenReturn(enabledPatient(5L));
+        when(patientDirectory.requireEnabledPatientIdByUserId(1L)).thenReturn(5L);
         when(appointmentWaitlistMapper.selectOne(any())).thenReturn(waitlist(20L));
         when(appointmentWaitlistMapper.update(org.mockito.ArgumentMatchers.isNull(), any())).thenReturn(1);
 
@@ -154,7 +163,7 @@ class AppointmentWaitlistServiceImplTest {
         AppointmentWaitlistService service = createService();
         AppointmentWaitlist offered = waitlist(20L);
         offered.setStatus(WAITLIST_STATUS_OFFERED);
-        when(patientMapper.selectOne(any())).thenReturn(enabledPatient(5L));
+        when(patientDirectory.requireEnabledPatientIdByUserId(1L)).thenReturn(5L);
         when(appointmentWaitlistMapper.selectOne(any())).thenReturn(offered);
 
         assertThatThrownBy(() -> service.cancel(1L, 20L)).isInstanceOf(BusinessException.class);
@@ -211,7 +220,7 @@ class AppointmentWaitlistServiceImplTest {
         AppointmentWaitlist offered = waitlist(20L);
         offered.setStatus(WAITLIST_STATUS_OFFERED);
         offered.setOfferExpireTime(LocalDateTime.now().plusMinutes(5));
-        when(patientMapper.selectOne(any())).thenReturn(enabledPatient(5L));
+        when(patientDirectory.requireEnabledPatientIdByUserId(1L)).thenReturn(5L);
         when(appointmentWaitlistMapper.selectOne(any())).thenReturn(offered);
         when(appointmentMapper.findActiveByPatientIdAndScheduleSlotId(5L, 10L)).thenReturn(null);
         when(doctorScheduleSlotMapper.findById(10L)).thenReturn(fullOpenFutureSlot(10L));
@@ -232,7 +241,7 @@ class AppointmentWaitlistServiceImplTest {
         AppointmentWaitlist offered = waitlist(20L);
         offered.setStatus(WAITLIST_STATUS_OFFERED);
         offered.setOfferExpireTime(LocalDateTime.now().plusMinutes(5));
-        when(patientMapper.selectOne(any())).thenReturn(enabledPatient(5L));
+        when(patientDirectory.requireEnabledPatientIdByUserId(1L)).thenReturn(5L);
         when(appointmentWaitlistMapper.selectOne(any())).thenReturn(offered);
         when(appointmentMapper.findActiveByPatientIdAndScheduleSlotId(5L, 10L)).thenReturn(null);
         when(doctorScheduleSlotMapper.findById(10L)).thenReturn(fullOpenFutureSlot(10L));
@@ -251,7 +260,7 @@ class AppointmentWaitlistServiceImplTest {
         offered.setOfferExpireTime(LocalDateTime.now().plusMinutes(5));
         DoctorScheduleSlot endedSlot = fullOpenFutureSlot(10L);
         endedSlot.setScheduleDate(LocalDate.now().minusDays(1));
-        when(patientMapper.selectOne(any())).thenReturn(enabledPatient(5L));
+        when(patientDirectory.requireEnabledPatientIdByUserId(1L)).thenReturn(5L);
         when(appointmentWaitlistMapper.selectOne(any())).thenReturn(offered);
         when(appointmentMapper.findActiveByPatientIdAndScheduleSlotId(5L, 10L)).thenReturn(null);
         when(doctorScheduleSlotMapper.findById(10L)).thenReturn(endedSlot);
@@ -270,7 +279,7 @@ class AppointmentWaitlistServiceImplTest {
         offered.setOfferExpireTime(LocalDateTime.now().plusMinutes(5));
         DoctorScheduleSlot closedSlot = fullOpenFutureSlot(10L);
         closedSlot.setStatus("CLOSED");
-        when(patientMapper.selectOne(any())).thenReturn(enabledPatient(5L));
+        when(patientDirectory.requireEnabledPatientIdByUserId(1L)).thenReturn(5L);
         when(appointmentWaitlistMapper.selectOne(any())).thenReturn(offered);
         when(appointmentMapper.findActiveByPatientIdAndScheduleSlotId(5L, 10L)).thenReturn(null);
         when(doctorScheduleSlotMapper.findById(10L)).thenReturn(closedSlot);
@@ -384,9 +393,9 @@ class AppointmentWaitlistServiceImplTest {
     }
 
     private AppointmentWaitlistService createService() {
-        return new AppointmentWaitlistServiceImpl(patientMapper, doctorScheduleSlotMapper,
+        return new AppointmentWaitlistServiceImpl(patientDirectory, doctorScheduleSlotMapper,
                 appointmentMapper, appointmentWaitlistMapper, appointmentStockService,
-                new AppointmentWaitlistProperties(), outboxMessageService);
+                new AppointmentWaitlistProperties(), outboxMessageService, bookingViewAssembler);
     }
 
     private AppointmentWaitlistCreateDTO request(Long slotId) {
@@ -404,13 +413,6 @@ class AppointmentWaitlistServiceImplTest {
         slot.setStatus("OPEN");
         slot.setRemainingCapacity(0);
         return slot;
-    }
-
-    private Patient enabledPatient(Long id) {
-        Patient patient = new Patient();
-        patient.setId(id);
-        patient.setStatus(1);
-        return patient;
     }
 
     private AppointmentWaitlist waitlist(Long id) {

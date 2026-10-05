@@ -9,7 +9,9 @@ import java.util.List;
 @Data
 public class AdminAppointmentWaitlistQueueVO {
     private Long scheduleSlotId;
+    private Long departmentId;
     private String departmentName;
+    private Long doctorId;
     private String doctorName;
     private LocalDate scheduleDate;
     private String sessionName;

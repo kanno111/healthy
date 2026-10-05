@@ -24,5 +24,6 @@ nginx/**/logs/
 nginx/**/temp/
 
 # Runtime logs
+backend/**/logs/
 backend/logs/*.log
 log/*.log

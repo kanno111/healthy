@@ -1,13 +1,16 @@
 package com.healthy.appointment.service;
 
 import com.healthy.appointment.dto.ScheduleBatchDTO;
+import com.healthy.appointment.domain.booking.BookingViewAssembler;
+import com.healthy.appointment.domain.provider.DoctorSummary;
+import com.healthy.appointment.domain.provider.ProviderDirectory;
 import com.healthy.appointment.entity.DoctorScheduleSlot;
 import com.healthy.appointment.exception.BusinessException;
 import com.healthy.appointment.mapper.DoctorScheduleSlotMapper;
 import com.healthy.appointment.service.impl.ScheduleSlotServiceImpl;
-import com.healthy.appointment.vo.DoctorVO;
 import com.healthy.appointment.vo.ScheduleBatchResultVO;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
@@ -30,19 +33,27 @@ import static org.mockito.Mockito.when;
 @ExtendWith(MockitoExtension.class)
 class ScheduleSlotServiceImplTest {
     @Mock
-    private DoctorService doctorService;
+    private ProviderDirectory providerDirectory;
 
     @Mock
     private DoctorScheduleSlotMapper doctorScheduleSlotMapper;
 
     @Mock
     private AppointmentStockService appointmentStockService;
+    @Mock
+    private BookingViewAssembler bookingViewAssembler;
+
+    @BeforeEach
+    void preserveSlotViewsInUnitTests() {
+        org.mockito.Mockito.lenient().when(bookingViewAssembler.enrichScheduleSlots(any()))
+                .thenAnswer(invocation -> invocation.getArgument(0));
+    }
 
     @Test
     void batchCreateCreatesOneSlotForEachSession() {
-        ScheduleSlotService service = new ScheduleSlotServiceImpl(doctorService, doctorScheduleSlotMapper, appointmentStockService);
+        ScheduleSlotService service = createService();
         LocalDate date = LocalDate.now().plusDays(1);
-        when(doctorService.getById(1L)).thenReturn(enabledDoctor());
+        when(providerDirectory.requireDoctor(1L)).thenReturn(enabledDoctor());
         when(doctorScheduleSlotMapper.findOverlappingSlots(eq(1L), any())).thenReturn(List.of());
 
         ScheduleBatchResultVO result = service.batchCreate(request(date, LocalTime.of(9, 0), LocalTime.of(12, 0)));
@@ -67,9 +78,9 @@ class ScheduleSlotServiceImplTest {
 
     @Test
     void batchCreateRejectsExistingOverlapWithoutWritingAnything() {
-        ScheduleSlotService service = new ScheduleSlotServiceImpl(doctorService, doctorScheduleSlotMapper, appointmentStockService);
+        ScheduleSlotService service = createService();
         LocalDate date = LocalDate.now().plusDays(1);
-        when(doctorService.getById(1L)).thenReturn(enabledDoctor());
+        when(providerDirectory.requireDoctor(1L)).thenReturn(enabledDoctor());
         when(doctorScheduleSlotMapper.findOverlappingSlots(eq(1L), any())).thenReturn(List.of(new DoctorScheduleSlot()));
 
         assertThatThrownBy(() -> service.batchCreate(request(date, LocalTime.of(9, 0), LocalTime.of(12, 0))))
@@ -80,12 +91,12 @@ class ScheduleSlotServiceImplTest {
 
     @Test
     void batchCreateRejectsOverlappingSessionsInSameRequest() {
-        ScheduleSlotService service = new ScheduleSlotServiceImpl(doctorService, doctorScheduleSlotMapper, appointmentStockService);
+        ScheduleSlotService service = createService();
         LocalDate date = LocalDate.now().plusDays(1);
         ScheduleBatchDTO request = request(date, LocalTime.of(9, 0), LocalTime.of(12, 0));
         request.setSessions(List.of(session(LocalTime.of(9, 0), LocalTime.of(12, 0)),
                 session(LocalTime.of(10, 0), LocalTime.of(12, 30))));
-        when(doctorService.getById(1L)).thenReturn(enabledDoctor());
+        when(providerDirectory.requireDoctor(1L)).thenReturn(enabledDoctor());
 
         assertThatThrownBy(() -> service.batchCreate(request)).isInstanceOf(BusinessException.class);
 
@@ -95,7 +106,7 @@ class ScheduleSlotServiceImplTest {
 
     @Test
     void updateCapacityUsesPositiveDeltaInsteadOfOverwritingConcurrentRedisDeduction() {
-        ScheduleSlotService service = new ScheduleSlotServiceImpl(doctorService, doctorScheduleSlotMapper, appointmentStockService);
+        ScheduleSlotService service = createService();
         when(doctorScheduleSlotMapper.findById(10L)).thenReturn(slot(10L, 6, 2));
         when(doctorScheduleSlotMapper.updateCapacity(10L, 15, 2)).thenReturn(1);
 
@@ -107,7 +118,7 @@ class ScheduleSlotServiceImplTest {
 
     @Test
     void updateCapacityUsesNegativeDeltaInsteadOfOverwritingConcurrentRedisDeduction() {
-        ScheduleSlotService service = new ScheduleSlotServiceImpl(doctorService, doctorScheduleSlotMapper, appointmentStockService);
+        ScheduleSlotService service = createService();
         // 已预约 4 个，缩容至 8 仍合法；Redis 仅原子减 2，不会 SET 覆盖并发 DECR。
         when(doctorScheduleSlotMapper.findById(10L)).thenReturn(slot(10L, 6, 2));
         when(doctorScheduleSlotMapper.updateCapacity(10L, 8, 2)).thenReturn(1);
@@ -119,7 +130,7 @@ class ScheduleSlotServiceImplTest {
 
     @Test
     void updateCapacityLeavesMissingRedisKeyForLazyReload() {
-        ScheduleSlotService service = new ScheduleSlotServiceImpl(doctorService, doctorScheduleSlotMapper, appointmentStockService);
+        ScheduleSlotService service = createService();
         when(doctorScheduleSlotMapper.findById(10L)).thenReturn(slot(10L, 6, 2));
         when(doctorScheduleSlotMapper.updateCapacity(10L, 12, 2)).thenReturn(1);
         // false 表示 Lua 发现 Redis key 缺失，服务层不 SET 新值。
@@ -134,8 +145,7 @@ class ScheduleSlotServiceImplTest {
 
     @Test
     void updateStatusRejectsReopeningEndedSlot() {
-        ScheduleSlotService service = new ScheduleSlotServiceImpl(
-                doctorService, doctorScheduleSlotMapper, appointmentStockService);
+        ScheduleSlotService service = createService();
         DoctorScheduleSlot endedSlot = slot(10L, 2, 3);
         endedSlot.setScheduleDate(LocalDate.now().minusDays(1));
         endedSlot.setEndTime(LocalTime.of(12, 0));
@@ -147,6 +157,11 @@ class ScheduleSlotServiceImplTest {
 
         verify(doctorScheduleSlotMapper, never()).updateStatus(anyLong(), any(), anyInt());
         verify(appointmentStockService, never()).initialize(anyLong(), anyInt());
+    }
+
+    private ScheduleSlotService createService() {
+        return new ScheduleSlotServiceImpl(
+                providerDirectory, doctorScheduleSlotMapper, appointmentStockService, bookingViewAssembler);
     }
 
     private ScheduleBatchDTO request(LocalDate date, LocalTime startTime, LocalTime endTime) {
@@ -169,8 +184,8 @@ class ScheduleSlotServiceImplTest {
         return session;
     }
 
-    private DoctorVO enabledDoctor() {
-        DoctorVO doctor = new DoctorVO();
+    private DoctorSummary enabledDoctor() {
+        DoctorSummary doctor = new DoctorSummary();
         doctor.setId(1L);
         doctor.setStatus(1);
         return doctor;

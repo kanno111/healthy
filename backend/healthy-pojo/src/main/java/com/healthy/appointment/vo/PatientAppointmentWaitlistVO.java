@@ -10,6 +10,8 @@ import java.time.LocalTime;
 public class PatientAppointmentWaitlistVO {
     private Long id;
     private Long scheduleSlotId;
+    private Long doctorId;
+    private Long departmentId;
     private String doctorName;
     private String departmentName;
     private LocalDate scheduleDate;

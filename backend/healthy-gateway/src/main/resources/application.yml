@@ -1,0 +1,53 @@
+server:
+  port: ${GATEWAY_PORT:8080}
+
+spring:
+  application:
+    name: healthy-gateway
+  config:
+    import:
+      - optional:nacos:${spring.application.name}.yaml?group=${NACOS_CONFIG_GROUP:DEFAULT_GROUP}&refreshEnabled=true
+  cloud:
+    nacos:
+      server-addr: ${NACOS_SERVER_ADDR:127.0.0.1:8848}
+      username: ${NACOS_USERNAME:}
+      password: ${NACOS_PASSWORD:}
+      discovery:
+        group: ${NACOS_DISCOVERY_GROUP:DEFAULT_GROUP}
+    gateway:
+      server:
+        webflux:
+          httpclient:
+            connect-timeout: 3000
+            response-timeout: 10s
+          routes:
+            - id: healthy-server
+              uri: lb://healthy-server
+              predicates:
+                - Path=/api/**
+    sentinel:
+      enabled: true
+      eager: true
+      transport:
+        dashboard: ${SENTINEL_DASHBOARD:127.0.0.1:8858}
+      datasource:
+        gateway-flow:
+          nacos:
+            server-addr: ${NACOS_SERVER_ADDR:127.0.0.1:8848}
+            username: ${NACOS_USERNAME:}
+            password: ${NACOS_PASSWORD:}
+            data-id: ${SENTINEL_GATEWAY_RULE_DATA_ID:healthy-gateway-flow-rules}
+            group-id: ${NACOS_CONFIG_GROUP:DEFAULT_GROUP}
+            data-type: json
+            rule-type: gw-flow
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,gateway,sentinel
+
+logging:
+  level:
+    root: info
+    com.healthy.gateway: info

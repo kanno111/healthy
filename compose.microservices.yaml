@@ -1,0 +1,30 @@
+name: healthy-microservice-infra
+
+# Only newly introduced microservice infrastructure belongs here.
+# MySQL, Redis and RabbitMQ intentionally keep using the existing host services.
+services:
+  nacos:
+    image: nacos/nacos-server:v3.1.1
+    container_name: healthy-nacos
+    restart: unless-stopped
+    environment:
+      MODE: standalone
+      PREFER_HOST_MODE: hostname
+      NACOS_AUTH_ENABLE: "false"
+      NACOS_AUTH_IDENTITY_KEY: ${NACOS_AUTH_IDENTITY_KEY:-healthyLocalIdentityKey}
+      NACOS_AUTH_IDENTITY_VALUE: ${NACOS_AUTH_IDENTITY_VALUE:-healthyLocalIdentityValue}
+      NACOS_AUTH_TOKEN: ${NACOS_AUTH_TOKEN:-SGVhbHRoeUxvY2FsRGV2ZWxvcG1lbnRTZWNyZXRLZXlGb3JOYWNvcw==}
+      JVM_XMS: 256m
+      JVM_XMX: 512m
+      JVM_XMN: 128m
+    ports:
+      - "127.0.0.1:8848:8848"
+      - "127.0.0.1:8849:8080"
+      - "127.0.0.1:9848:9848"
+    volumes:
+      - nacos_data:/home/nacos/data
+      - nacos_logs:/home/nacos/logs
+
+volumes:
+  nacos_data:
+  nacos_logs:

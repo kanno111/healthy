@@ -4,8 +4,7 @@
         "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
 <mapper namespace="com.healthy.appointment.mapper.AppointmentMapper">
     <sql id="patientAppointmentColumns">
-        appointment.id, appointment.appointment_no, appointment.doctor_id,
-        doctor.name AS doctor_name, doctor.department_id, department.name AS department_name,
+        appointment.id, appointment.appointment_no, appointment.patient_id, appointment.doctor_id,
         appointment.schedule_slot_id, appointment.schedule_date, slot.session_name,
         appointment.start_time, appointment.end_time, appointment.status, appointment.created_at
     </sql>
@@ -23,8 +22,6 @@
     <select id="findByRequestIdAndPatientId" resultType="com.healthy.appointment.vo.PatientAppointmentVO">
         SELECT <include refid="patientAppointmentColumns"/>
         FROM appointment
-        INNER JOIN doctor ON doctor.id = appointment.doctor_id
-        INNER JOIN department ON department.id = doctor.department_id
         LEFT JOIN doctor_schedule_slot slot ON slot.id = appointment.schedule_slot_id
         WHERE appointment.request_id = #{requestId}
           AND appointment.patient_id = #{patientId}
@@ -33,8 +30,6 @@
     <select id="findActiveByPatientIdAndScheduleSlotId" resultType="com.healthy.appointment.vo.PatientAppointmentVO">
         SELECT <include refid="patientAppointmentColumns"/>
         FROM appointment
-        INNER JOIN doctor ON doctor.id = appointment.doctor_id
-        INNER JOIN department ON department.id = doctor.department_id
         LEFT JOIN doctor_schedule_slot slot ON slot.id = appointment.schedule_slot_id
         WHERE appointment.patient_id = #{patientId}
           AND appointment.schedule_slot_id = #{scheduleSlotId}
@@ -66,15 +61,11 @@
 
     <select id="pageForDoctor" resultType="com.healthy.appointment.vo.DoctorAppointmentVO">
         SELECT appointment.id, appointment.appointment_no,
-               patient.real_name AS patient_name,
-               department.name AS department_name,
+               appointment.patient_id, appointment.doctor_id,
                appointment.schedule_slot_id, appointment.schedule_date,
                slot.session_name, appointment.start_time, appointment.end_time,
                appointment.status
         FROM appointment
-        INNER JOIN patient ON patient.id = appointment.patient_id
-        INNER JOIN doctor ON doctor.id = appointment.doctor_id
-        INNER JOIN department ON department.id = doctor.department_id
         LEFT JOIN doctor_schedule_slot slot ON slot.id = appointment.schedule_slot_id
         WHERE appointment.doctor_id = #{doctorId}
           AND appointment.schedule_date = #{scheduleDate}
@@ -95,15 +86,11 @@
 
     <select id="pageForAdmin" resultType="com.healthy.appointment.vo.AdminAppointmentVO">
         SELECT appointment.id, appointment.appointment_no,
-               patient.real_name AS patient_name,
-               doctor.name AS doctor_name, department.name AS department_name,
+               appointment.patient_id, appointment.doctor_id,
                appointment.schedule_date, slot.session_name,
                appointment.start_time, appointment.end_time,
                appointment.status, appointment.created_at
         FROM appointment
-        INNER JOIN patient ON patient.id = appointment.patient_id
-        INNER JOIN doctor ON doctor.id = appointment.doctor_id
-        INNER JOIN department ON department.id = doctor.department_id
         LEFT JOIN doctor_schedule_slot slot ON slot.id = appointment.schedule_slot_id
         ORDER BY appointment.schedule_date DESC, appointment.start_time DESC, appointment.id DESC
     </select>
@@ -111,8 +98,6 @@
     <select id="findByIdAndPatientId" resultType="com.healthy.appointment.vo.PatientAppointmentVO">
         SELECT <include refid="patientAppointmentColumns"/>
         FROM appointment
-        INNER JOIN doctor ON doctor.id = appointment.doctor_id
-        INNER JOIN department ON department.id = doctor.department_id
         LEFT JOIN doctor_schedule_slot slot ON slot.id = appointment.schedule_slot_id
         WHERE appointment.id = #{id}
           AND appointment.patient_id = #{patientId}
@@ -121,8 +106,6 @@
     <select id="listByPatientId" resultType="com.healthy.appointment.vo.PatientAppointmentVO">
         SELECT <include refid="patientAppointmentColumns"/>
         FROM appointment
-        INNER JOIN doctor ON doctor.id = appointment.doctor_id
-        INNER JOIN department ON department.id = doctor.department_id
         LEFT JOIN doctor_schedule_slot slot ON slot.id = appointment.schedule_slot_id
         WHERE appointment.patient_id = #{patientId}
         ORDER BY appointment.created_at DESC, appointment.id DESC

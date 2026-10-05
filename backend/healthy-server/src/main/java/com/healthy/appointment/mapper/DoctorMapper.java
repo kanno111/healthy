@@ -6,8 +6,6 @@ import com.healthy.appointment.entity.Doctor;
 import com.healthy.appointment.vo.DoctorVO;
 import org.apache.ibatis.annotations.Param;
 
-import java.time.LocalDate;
-import java.time.LocalTime;
 import java.util.List;
 
 public interface DoctorMapper extends BaseMapper<Doctor> {
@@ -19,15 +17,15 @@ public interface DoctorMapper extends BaseMapper<Doctor> {
             @Param("keyword") String keyword,
             @Param("departmentId") Long departmentId,
             @Param("status") Integer status,
-            @Param("departmentStatus") Integer departmentStatus,
-            @Param("availableFirst") boolean availableFirst,
-            @Param("availabilityStartDate") LocalDate availabilityStartDate,
-            @Param("availabilityEndDate") LocalDate availabilityEndDate,
-            @Param("currentTime") LocalTime currentTime
+            @Param("departmentStatus") Integer departmentStatus
     );
 
     DoctorVO findById(@Param("id") Long id);
 
     Doctor findEnabledByUserId(@Param("userId") Long userId);
+
+    List<DoctorVO> listByIds(@Param("doctorIds") List<Long> doctorIds);
+
+    List<Long> findIdsByDepartment(@Param("departmentId") Long departmentId);
 
 }
