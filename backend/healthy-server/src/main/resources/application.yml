@@ -5,6 +5,12 @@ spring:
     import:
       - optional:nacos:${spring.application.name}.yaml?group=${NACOS_CONFIG_GROUP:DEFAULT_GROUP}&refreshEnabled=true
   cloud:
+    openfeign:
+      client:
+        config:
+          default:
+            connect-timeout: 2000
+            read-timeout: 3000
     nacos:
       server-addr: ${NACOS_SERVER_ADDR:127.0.0.1:8848}
       username: ${NACOS_USERNAME:}
@@ -52,6 +58,8 @@ server:
   port: ${SERVER_PORT:8081}
   servlet:
     context-path: /api
+
+mybatis-plus:
   mapper-locations: classpath*:mapper/**/*.xml
   type-aliases-package: com.healthy.appointment.entity
   configuration:
@@ -75,10 +83,6 @@ logging:
     org.mybatis: info
     com.baomidou.mybatisplus: info
     org.springframework: info
-
-jwt:
-  secret: ${JWT_SECRET:healthy-appointment-local-development-secret-key-2026}
-  ttl: PT24H
 
 appointment:
   stock:

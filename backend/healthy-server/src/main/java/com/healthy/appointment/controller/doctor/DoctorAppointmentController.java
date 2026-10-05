@@ -1,6 +1,6 @@
 package com.healthy.appointment.controller.doctor;
 
-import com.healthy.appointment.interceptor.JwtAuthInterceptor;
+import com.healthy.appointment.interceptor.GatewayIdentityInterceptor;
 import com.healthy.appointment.result.ApiResponse;
 import com.healthy.appointment.result.PageResult;
 import com.healthy.appointment.service.DoctorAppointmentService;
@@ -25,7 +25,7 @@ public class DoctorAppointmentController {
 
     @GetMapping
     public ApiResponse<PageResult<DoctorAppointmentVO>> pageMine(
-            @RequestAttribute(JwtAuthInterceptor.CURRENT_USER_ID) Long userId,
+            @RequestAttribute(GatewayIdentityInterceptor.CURRENT_USER_ID) Long userId,
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate scheduleDate,
             @RequestParam(required = false) String status,
             @RequestParam(defaultValue = "1") int page,
@@ -36,7 +36,7 @@ public class DoctorAppointmentController {
 
     @PutMapping("/{appointmentId}/complete")
     public ApiResponse<Void> complete(
-            @RequestAttribute(JwtAuthInterceptor.CURRENT_USER_ID) Long userId,
+            @RequestAttribute(GatewayIdentityInterceptor.CURRENT_USER_ID) Long userId,
             @PathVariable Long appointmentId) {
         doctorAppointmentService.complete(userId, appointmentId);
         return ApiResponse.success();

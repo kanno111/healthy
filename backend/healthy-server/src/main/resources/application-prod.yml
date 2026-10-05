@@ -20,10 +20,6 @@ spring:
     username: ${RABBITMQ_USERNAME}
     password: ${RABBITMQ_PASSWORD}
 
-jwt:
-  secret: ${JWT_SECRET}
-  ttl: PT24H
-
 logging:
   level:
     root: info

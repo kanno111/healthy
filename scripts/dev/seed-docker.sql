@@ -1,7 +1,8 @@
 -- Development-only sample data for the Docker MySQL database.
 -- Do not place this file in Flyway's db/migration directory.
 -- Safe to run repeatedly: stable usernames/codes/numbers and upserts prevent duplicates.
--- This development script expects healthy and healthy_doctor on the same MySQL instance.
+-- This development script expects healthy, healthy_doctor and healthy_identity
+-- on the same MySQL instance.
 
 SET NAMES utf8mb4;
 USE healthy;
@@ -17,7 +18,7 @@ SET @two_weeks = DATE_ADD(@today, INTERVAL 13 DAY);
 SET @demo_date_key = DATE_FORMAT(@today, '%Y%m%d');
 
 -- All demo accounts use password 123456.
-INSERT INTO sys_user (username, password_hash, name, phone, role, status)
+INSERT INTO healthy_identity.sys_user (username, password_hash, name, phone, role, status)
 VALUES
     ('staff_demo', @demo_password_hash, '演示管理员', '19990000001', 'STAFF', 1),
     ('doctor_cardio', @demo_password_hash, '林知远', '19990000011', 'DOCTOR', 1),
@@ -48,29 +49,29 @@ ON DUPLICATE KEY UPDATE
     role = VALUES(role),
     status = VALUES(status);
 
-SET @staff_user_id = (SELECT id FROM sys_user WHERE username = 'staff_demo');
-SET @cardio_user_id = (SELECT id FROM sys_user WHERE username = 'doctor_cardio');
-SET @cardio_2_user_id = (SELECT id FROM sys_user WHERE username = 'doctor_cardio_2');
-SET @digestive_user_id = (SELECT id FROM sys_user WHERE username = 'doctor_digestive');
-SET @digestive_2_user_id = (SELECT id FROM sys_user WHERE username = 'doctor_digestive_2');
-SET @pediatrics_user_id = (SELECT id FROM sys_user WHERE username = 'doctor_pediatrics');
-SET @respiratory_user_id = (SELECT id FROM sys_user WHERE username = 'doctor_respiratory');
-SET @neurology_user_id = (SELECT id FROM sys_user WHERE username = 'doctor_neurology');
-SET @orthopedics_user_id = (SELECT id FROM sys_user WHERE username = 'doctor_orthopedics');
-SET @dermatology_user_id = (SELECT id FROM sys_user WHERE username = 'doctor_dermatology');
-SET @ophthalmology_user_id = (SELECT id FROM sys_user WHERE username = 'doctor_ophthalmology');
-SET @patient_demo_user_id = (SELECT id FROM sys_user WHERE username = 'patient_demo');
-SET @patient_wang_user_id = (SELECT id FROM sys_user WHERE username = 'patient_wang');
-SET @patient_li_user_id = (SELECT id FROM sys_user WHERE username = 'patient_li');
-SET @patient_zhao_user_id = (SELECT id FROM sys_user WHERE username = 'patient_zhao');
-SET @patient_chen_user_id = (SELECT id FROM sys_user WHERE username = 'patient_chen');
-SET @patient_zhou_user_id = (SELECT id FROM sys_user WHERE username = 'patient_zhou');
-SET @patient_sun_user_id = (SELECT id FROM sys_user WHERE username = 'patient_sun');
-SET @patient_wu_user_id = (SELECT id FROM sys_user WHERE username = 'patient_wu');
-SET @patient_zheng_user_id = (SELECT id FROM sys_user WHERE username = 'patient_zheng');
-SET @patient_feng_user_id = (SELECT id FROM sys_user WHERE username = 'patient_feng');
-SET @patient_he_user_id = (SELECT id FROM sys_user WHERE username = 'patient_he');
-SET @patient_luo_user_id = (SELECT id FROM sys_user WHERE username = 'patient_luo');
+SET @staff_user_id = (SELECT id FROM healthy_identity.sys_user WHERE username = 'staff_demo');
+SET @cardio_user_id = (SELECT id FROM healthy_identity.sys_user WHERE username = 'doctor_cardio');
+SET @cardio_2_user_id = (SELECT id FROM healthy_identity.sys_user WHERE username = 'doctor_cardio_2');
+SET @digestive_user_id = (SELECT id FROM healthy_identity.sys_user WHERE username = 'doctor_digestive');
+SET @digestive_2_user_id = (SELECT id FROM healthy_identity.sys_user WHERE username = 'doctor_digestive_2');
+SET @pediatrics_user_id = (SELECT id FROM healthy_identity.sys_user WHERE username = 'doctor_pediatrics');
+SET @respiratory_user_id = (SELECT id FROM healthy_identity.sys_user WHERE username = 'doctor_respiratory');
+SET @neurology_user_id = (SELECT id FROM healthy_identity.sys_user WHERE username = 'doctor_neurology');
+SET @orthopedics_user_id = (SELECT id FROM healthy_identity.sys_user WHERE username = 'doctor_orthopedics');
+SET @dermatology_user_id = (SELECT id FROM healthy_identity.sys_user WHERE username = 'doctor_dermatology');
+SET @ophthalmology_user_id = (SELECT id FROM healthy_identity.sys_user WHERE username = 'doctor_ophthalmology');
+SET @patient_demo_user_id = (SELECT id FROM healthy_identity.sys_user WHERE username = 'patient_demo');
+SET @patient_wang_user_id = (SELECT id FROM healthy_identity.sys_user WHERE username = 'patient_wang');
+SET @patient_li_user_id = (SELECT id FROM healthy_identity.sys_user WHERE username = 'patient_li');
+SET @patient_zhao_user_id = (SELECT id FROM healthy_identity.sys_user WHERE username = 'patient_zhao');
+SET @patient_chen_user_id = (SELECT id FROM healthy_identity.sys_user WHERE username = 'patient_chen');
+SET @patient_zhou_user_id = (SELECT id FROM healthy_identity.sys_user WHERE username = 'patient_zhou');
+SET @patient_sun_user_id = (SELECT id FROM healthy_identity.sys_user WHERE username = 'patient_sun');
+SET @patient_wu_user_id = (SELECT id FROM healthy_identity.sys_user WHERE username = 'patient_wu');
+SET @patient_zheng_user_id = (SELECT id FROM healthy_identity.sys_user WHERE username = 'patient_zheng');
+SET @patient_feng_user_id = (SELECT id FROM healthy_identity.sys_user WHERE username = 'patient_feng');
+SET @patient_he_user_id = (SELECT id FROM healthy_identity.sys_user WHERE username = 'patient_he');
+SET @patient_luo_user_id = (SELECT id FROM healthy_identity.sys_user WHERE username = 'patient_luo');
 
 INSERT INTO healthy_doctor.department (name, description, sort_order, status)
 VALUES
@@ -96,7 +97,7 @@ SET @orthopedics_department_id = (SELECT id FROM healthy_doctor.department WHERE
 SET @dermatology_department_id = (SELECT id FROM healthy_doctor.department WHERE name = '皮肤科');
 SET @ophthalmology_department_id = (SELECT id FROM healthy_doctor.department WHERE name = '眼科');
 
-INSERT INTO patient (user_id, real_name, gender, birthday, id_card, medical_card_no, status)
+INSERT INTO healthy_identity.patient (user_id, real_name, gender, birthday, id_card, medical_card_no, status)
 VALUES
     (@patient_demo_user_id, '张小明', 1, '1995-05-12', NULL, 'DEMO-MC-001', 1),
     (@patient_wang_user_id, '王女士', 2, '1988-11-03', NULL, 'DEMO-MC-002', 1),
@@ -115,18 +116,18 @@ ON DUPLICATE KEY UPDATE
     gender = VALUES(gender),
     status = VALUES(status);
 
-SET @patient_demo_id = (SELECT id FROM patient WHERE user_id = @patient_demo_user_id);
-SET @patient_wang_id = (SELECT id FROM patient WHERE user_id = @patient_wang_user_id);
-SET @patient_li_id = (SELECT id FROM patient WHERE user_id = @patient_li_user_id);
-SET @patient_zhao_id = (SELECT id FROM patient WHERE user_id = @patient_zhao_user_id);
-SET @patient_chen_id = (SELECT id FROM patient WHERE user_id = @patient_chen_user_id);
-SET @patient_zhou_id = (SELECT id FROM patient WHERE user_id = @patient_zhou_user_id);
-SET @patient_sun_id = (SELECT id FROM patient WHERE user_id = @patient_sun_user_id);
-SET @patient_wu_id = (SELECT id FROM patient WHERE user_id = @patient_wu_user_id);
-SET @patient_zheng_id = (SELECT id FROM patient WHERE user_id = @patient_zheng_user_id);
-SET @patient_feng_id = (SELECT id FROM patient WHERE user_id = @patient_feng_user_id);
-SET @patient_he_id = (SELECT id FROM patient WHERE user_id = @patient_he_user_id);
-SET @patient_luo_id = (SELECT id FROM patient WHERE user_id = @patient_luo_user_id);
+SET @patient_demo_id = (SELECT id FROM healthy_identity.patient WHERE user_id = @patient_demo_user_id);
+SET @patient_wang_id = (SELECT id FROM healthy_identity.patient WHERE user_id = @patient_wang_user_id);
+SET @patient_li_id = (SELECT id FROM healthy_identity.patient WHERE user_id = @patient_li_user_id);
+SET @patient_zhao_id = (SELECT id FROM healthy_identity.patient WHERE user_id = @patient_zhao_user_id);
+SET @patient_chen_id = (SELECT id FROM healthy_identity.patient WHERE user_id = @patient_chen_user_id);
+SET @patient_zhou_id = (SELECT id FROM healthy_identity.patient WHERE user_id = @patient_zhou_user_id);
+SET @patient_sun_id = (SELECT id FROM healthy_identity.patient WHERE user_id = @patient_sun_user_id);
+SET @patient_wu_id = (SELECT id FROM healthy_identity.patient WHERE user_id = @patient_wu_user_id);
+SET @patient_zheng_id = (SELECT id FROM healthy_identity.patient WHERE user_id = @patient_zheng_user_id);
+SET @patient_feng_id = (SELECT id FROM healthy_identity.patient WHERE user_id = @patient_feng_user_id);
+SET @patient_he_id = (SELECT id FROM healthy_identity.patient WHERE user_id = @patient_he_user_id);
+SET @patient_luo_id = (SELECT id FROM healthy_identity.patient WHERE user_id = @patient_luo_user_id);
 
 INSERT INTO healthy_doctor.doctor (
     user_id, name, gender, department_id, doctor_code, title,

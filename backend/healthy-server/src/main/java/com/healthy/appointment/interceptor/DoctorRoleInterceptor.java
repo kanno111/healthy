@@ -12,7 +12,7 @@ import org.springframework.web.servlet.HandlerInterceptor;
 public class DoctorRoleInterceptor implements HandlerInterceptor {
     @Override
     public boolean preHandle(HttpServletRequest request, HttpServletResponse response, Object handler) {
-        Object role = request.getAttribute(JwtAuthInterceptor.CURRENT_USER_ROLE);
+        Object role = request.getAttribute(GatewayIdentityInterceptor.CURRENT_USER_ROLE);
         if (!"DOCTOR".equals(role)) {
             throw new BusinessException(ErrorCode.FORBIDDEN);
         }

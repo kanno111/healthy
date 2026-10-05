@@ -21,6 +21,11 @@ spring:
             connect-timeout: 3000
             response-timeout: 10s
           routes:
+            - id: healthy-identity-auth
+              uri: lb://healthy-identity
+              order: -110
+              predicates:
+                - Path=/api/auth/**
             - id: healthy-doctor-internal
               uri: lb://healthy-doctor
               order: -100

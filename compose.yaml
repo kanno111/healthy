@@ -10,7 +10,7 @@ services:
     ports:
       - "127.0.0.1:${WEB_PORT:-8089}:80"
     depends_on:
-      backend:
+      gateway:
         condition: service_healthy
     healthcheck:
       test: ["CMD-SHELL", "wget -qO- http://127.0.0.1/ >/dev/null || exit 1"]
@@ -18,45 +18,37 @@ services:
       timeout: 5s
       retries: 10
       start_period: 10s
-    networks:
-      - healthy-network
+    networks: [healthy-network]
 
-  backend:
+  gateway:
     build:
       context: ./backend
       dockerfile: Dockerfile
-    image: healthy-appointment-backend:local
+      args:
+        APP_MODULE: healthy-gateway
+    image: healthy-appointment-gateway:local
     restart: unless-stopped
     environment:
       TZ: ${TZ:-Asia/Shanghai}
-      SPRING_PROFILES_ACTIVE: prod
-      # Keep the legacy all-in-one deployment on its existing internal port.
-      # Local microservice development runs healthy-server on 8081 behind Gateway.
-      SERVER_PORT: 8080
-      DB_HOST: mysql
-      DB_PORT: 3306
-      DB_NAME: ${DB_NAME}
-      DB_USERNAME: ${DB_USERNAME}
-      DB_PASSWORD: ${DB_PASSWORD}
+      GATEWAY_PORT: 8080
+      NACOS_SERVER_ADDR: nacos:8848
       REDIS_HOST: redis
       REDIS_PORT: 6379
+      REDIS_DATABASE: 3
       REDIS_PASSWORD: ${REDIS_PASSWORD}
-      RABBITMQ_HOST: rabbitmq
-      RABBITMQ_PORT: 5672
-      RABBITMQ_USERNAME: ${RABBITMQ_USERNAME}
-      RABBITMQ_PASSWORD: ${RABBITMQ_PASSWORD}
       JWT_SECRET: ${JWT_SECRET}
-      FLYWAY_BASELINE_ON_MIGRATE: "false"
     ports:
-      - "127.0.0.1:8081:8080"
-    volumes:
-      - backend_logs:/app/logs
+      - "127.0.0.1:8080:8080"
     depends_on:
-      mysql:
-        condition: service_healthy
+      nacos:
+        condition: service_started
       redis:
         condition: service_healthy
-      rabbitmq:
+      booking:
+        condition: service_healthy
+      doctor:
+        condition: service_healthy
+      identity:
         condition: service_healthy
     healthcheck:
       test: ["CMD-SHELL", "bash -c 'exec 3<>/dev/tcp/127.0.0.1/8080'"]
@@ -64,8 +56,148 @@ services:
       timeout: 5s
       retries: 12
       start_period: 30s
-    networks:
-      - healthy-network
+    networks: [healthy-network]
+
+  booking:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+      args:
+        APP_MODULE: healthy-server
+    image: healthy-appointment-booking:local
+    restart: unless-stopped
+    environment:
+      TZ: ${TZ:-Asia/Shanghai}
+      SPRING_PROFILES_ACTIVE: prod
+      SERVER_PORT: 8081
+      DB_HOST: mysql
+      DB_PORT: 3306
+      DB_NAME: ${DB_NAME}
+      DB_USERNAME: ${DB_USERNAME}
+      DB_PASSWORD: ${DB_PASSWORD}
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      REDIS_DATABASE: 3
+      REDIS_PASSWORD: ${REDIS_PASSWORD}
+      RABBITMQ_HOST: rabbitmq
+      RABBITMQ_PORT: 5672
+      RABBITMQ_USERNAME: ${RABBITMQ_USERNAME}
+      RABBITMQ_PASSWORD: ${RABBITMQ_PASSWORD}
+      NACOS_SERVER_ADDR: nacos:8848
+      FLYWAY_BASELINE_ON_MIGRATE: "false"
+    ports:
+      - "127.0.0.1:8081:8081"
+    volumes:
+      - booking_logs:/app/logs
+    depends_on:
+      mysql:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+      nacos:
+        condition: service_started
+    healthcheck:
+      test: ["CMD-SHELL", "bash -c 'exec 3<>/dev/tcp/127.0.0.1/8081'"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 30s
+    networks: [healthy-network]
+
+  doctor:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+      args:
+        APP_MODULE: healthy-doctor
+    image: healthy-appointment-doctor:local
+    restart: unless-stopped
+    environment:
+      TZ: ${TZ:-Asia/Shanghai}
+      DOCTOR_SERVER_PORT: 8082
+      DOCTOR_DB_HOST: mysql
+      DOCTOR_DB_PORT: 3306
+      DOCTOR_DB_NAME: ${DOCTOR_DB_NAME}
+      DOCTOR_DB_USERNAME: ${DOCTOR_DB_USERNAME}
+      DOCTOR_DB_PASSWORD: ${DOCTOR_DB_PASSWORD}
+      NACOS_SERVER_ADDR: nacos:8848
+    ports:
+      - "127.0.0.1:8082:8082"
+    depends_on:
+      mysql:
+        condition: service_healthy
+      nacos:
+        condition: service_started
+    healthcheck:
+      test: ["CMD-SHELL", "bash -c 'exec 3<>/dev/tcp/127.0.0.1/8082'"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 30s
+    networks: [healthy-network]
+
+  identity:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+      args:
+        APP_MODULE: healthy-identity
+    image: healthy-appointment-identity:local
+    restart: unless-stopped
+    environment:
+      TZ: ${TZ:-Asia/Shanghai}
+      IDENTITY_SERVER_PORT: 8083
+      IDENTITY_DB_HOST: mysql
+      IDENTITY_DB_PORT: 3306
+      IDENTITY_DB_NAME: ${IDENTITY_DB_NAME}
+      IDENTITY_DB_USERNAME: ${IDENTITY_DB_USERNAME}
+      IDENTITY_DB_PASSWORD: ${IDENTITY_DB_PASSWORD}
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      REDIS_DATABASE: 3
+      REDIS_PASSWORD: ${REDIS_PASSWORD}
+      JWT_SECRET: ${JWT_SECRET}
+      NACOS_SERVER_ADDR: nacos:8848
+    ports:
+      - "127.0.0.1:8083:8083"
+    depends_on:
+      mysql:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      nacos:
+        condition: service_started
+    healthcheck:
+      test: ["CMD-SHELL", "bash -c 'exec 3<>/dev/tcp/127.0.0.1/8083'"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 30s
+    networks: [healthy-network]
+
+  nacos:
+    image: nacos/nacos-server:v3.1.1
+    restart: unless-stopped
+    environment:
+      MODE: standalone
+      PREFER_HOST_MODE: hostname
+      NACOS_AUTH_ENABLE: "false"
+      NACOS_AUTH_IDENTITY_KEY: ${NACOS_AUTH_IDENTITY_KEY:-healthyComposeIdentityKey}
+      NACOS_AUTH_IDENTITY_VALUE: ${NACOS_AUTH_IDENTITY_VALUE:-healthyComposeIdentityValue}
+      NACOS_AUTH_TOKEN: ${NACOS_AUTH_TOKEN:-SGVhbHRoeUNvbXBvc2VEZXZlbG9wbWVudFNlY3JldEtleUZvck5hY29z}
+      JVM_XMS: 256m
+      JVM_XMX: 512m
+      JVM_XMN: 128m
+    ports:
+      - "127.0.0.1:8848:8848"
+      - "127.0.0.1:8849:8080"
+      - "127.0.0.1:9848:9848"
+    volumes:
+      - nacos_data:/home/nacos/data
+      - nacos_logs:/home/nacos/logs
+    networks: [healthy-network]
 
   mysql:
     image: mysql:8.0
@@ -76,6 +208,12 @@ services:
       MYSQL_USER: ${DB_USERNAME}
       MYSQL_PASSWORD: ${DB_PASSWORD}
       MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD}
+      DOCTOR_DB_USERNAME: ${DOCTOR_DB_USERNAME}
+      DOCTOR_DB_PASSWORD: ${DOCTOR_DB_PASSWORD}
+      DOCTOR_DB_NAME: ${DOCTOR_DB_NAME}
+      IDENTITY_DB_USERNAME: ${IDENTITY_DB_USERNAME}
+      IDENTITY_DB_PASSWORD: ${IDENTITY_DB_PASSWORD}
+      IDENTITY_DB_NAME: ${IDENTITY_DB_NAME}
     command:
       - --character-set-server=utf8mb4
       - --collation-server=utf8mb4_unicode_ci
@@ -83,14 +221,14 @@ services:
       - "127.0.0.1:3307:3306"
     volumes:
       - mysql_data:/var/lib/mysql
+      - ./docker/mysql/init:/docker-entrypoint-initdb.d:ro
     healthcheck:
       test: ["CMD-SHELL", "mysqladmin ping -h 127.0.0.1 -uroot -p\"$${MYSQL_ROOT_PASSWORD}\" --silent"]
       interval: 10s
       timeout: 5s
       retries: 10
       start_period: 30s
-    networks:
-      - healthy-network
+    networks: [healthy-network]
 
   redis:
     image: public.ecr.aws/docker/library/redis:7.4.11-alpine3.21
@@ -108,8 +246,7 @@ services:
       interval: 10s
       timeout: 5s
       retries: 10
-    networks:
-      - healthy-network
+    networks: [healthy-network]
 
   rabbitmq:
     image: public.ecr.aws/docker/library/rabbitmq:4.1.8-management-alpine
@@ -129,15 +266,16 @@ services:
       timeout: 5s
       retries: 10
       start_period: 20s
-    networks:
-      - healthy-network
+    networks: [healthy-network]
 
 networks:
   healthy-network:
     driver: bridge
 
 volumes:
-  backend_logs:
+  booking_logs:
   mysql_data:
   redis_data:
   rabbitmq_data:
+  nacos_data:
+  nacos_logs:

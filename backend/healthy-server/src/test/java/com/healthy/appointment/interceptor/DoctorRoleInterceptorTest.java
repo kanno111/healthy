@@ -31,7 +31,7 @@ class DoctorRoleInterceptorTest {
 
     private HttpServletRequest requestWithRole(String role) {
         HttpServletRequest request = mock(HttpServletRequest.class);
-        when(request.getAttribute(JwtAuthInterceptor.CURRENT_USER_ROLE)).thenReturn(role);
+        when(request.getAttribute(GatewayIdentityInterceptor.CURRENT_USER_ROLE)).thenReturn(role);
         return request;
     }
 }

@@ -1,58 +1,107 @@
-# 智约医疗后端
+# 智慧医疗预约后端
 
-基于 Java 21、Spring Boot 4.1、Spring Cloud、Spring Cloud Alibaba、MyBatis-Plus、MySQL、Redis 与 RabbitMQ 的预约挂号系统。
+项目基于 Java 21、Spring Boot 4.1、Spring Cloud、Spring Cloud Alibaba、
+MyBatis-Plus、MySQL、Redis 与 RabbitMQ。当前已经从单体演进为四个独立进程：
 
-这是一个 Maven 多模块工程：
+- `healthy-gateway`：统一入口，校验 JWT + Redis 会话，注入可信用户 ID/角色并路由请求。
+- `healthy-identity`：账号、患者档案、注册登录、JWT 签发与 Redis 会话，独占 `healthy_identity`。
+- `healthy-doctor`：科室和医生主数据，独占 `healthy_doctor`。
+- `healthy-server`：booking-service，负责排班号源、预约、候补、Outbox 和 RabbitMQ，独占 `healthy`。
 
-- `healthy-common`：错误码、统一响应和公共异常。
-- `healthy-pojo`：identity/booking 尚未拆出的实体、DTO 和 VO；不再承载 doctor-service 模型。
-- `healthy-server`：identity 与 booking 业务服务，通过 Feign 读取医生主数据。
-- `healthy-gateway`：统一入口，使用 Nacos 服务发现、Spring Cloud Gateway 路由和 Sentinel 限流能力。
-- `healthy-doctor`：doctor-service；拥有医生、科室的数据库和 Java 模型，直接提供管理端医生/科室 API、患者端科室列表及 booking 所需的内部查询接口。
+`healthy-common` 只放跨服务响应、错误码和安全协议；`healthy-pojo` 只保留
+booking-service 使用的模型，不再承载 Identity 或 Doctor 的实体。
 
-`healthy-server` 的 `DoctorDirectory` 固定通过 Feign 和 Nacos 调用 `healthy-doctor`，不再包含医生或科室本地 Mapper。管理端 `/api/admin/doctors/**`、`/api/admin/departments/**` 与患者端 `/api/user/departments` 均由 Gateway 直接路由至 `healthy-doctor`，前端 API 地址不变。
+## 请求链路
 
-## 本地启动前准备
+前端 API 地址不需要修改，始终访问 Gateway 的 `/api/**`：
 
-1. 安装 JDK 21 与 Maven 3.9+。
-2. 创建两个独立数据库：
-   - `CREATE DATABASE healthy DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;`
-   - `CREATE DATABASE healthy_doctor DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;`
-3. 启动本机已有的 MySQL（3306）、Redis（6379）和 RabbitMQ（5672）。这三个基础设施不使用 Docker。
-4. 在项目根目录执行 `docker compose -f compose.microservices.yaml up -d nacos`，仅用 Docker 启动新引入的 Nacos（8848，控制台映射到 8849）。
-5. 在本目录执行 `mvn clean package`。
-6. 首次启动先运行 `healthy-doctor`，让它在 `healthy_doctor` 中执行自己的 Flyway；再启动另外两个服务：
-   - `java -jar healthy-doctor/target/healthy-doctor-0.0.1-SNAPSHOT.jar`
-   - `java -jar healthy-server/target/healthy-server-0.0.1-SNAPSHOT.jar`
-   - `java -jar healthy-gateway/target/healthy-gateway-0.0.1-SNAPSHOT.jar`
+```text
+Vue / Nginx
+    -> healthy-gateway:8080
+       -> /api/auth/**                         -> healthy-identity:8083
+       -> /api/admin/doctors/**                -> healthy-doctor:8082
+       -> /api/admin/departments/**            -> healthy-doctor:8082
+       -> /api/user/departments                -> healthy-doctor:8082
+       -> 其余 /api/**                         -> healthy-server:8081
 
-Gateway 默认监听 `http://localhost:8080`，identity/booking 服务监听 `http://localhost:8081`，doctor-service 监听 `http://localhost:8082`。前端及 Nginx 继续访问 `GET http://localhost:8080/api/health`；可通过 `GET http://localhost:8080/doctor-service/actuator/health` 验证 Gateway 对 doctor-service 的服务发现。
+healthy-server
+    -> Feign + Nacos -> healthy-identity（患者目录）
+    -> Feign + Nacos -> healthy-doctor（医生目录）
+```
 
-`healthy-server` 的 Flyway 只维护 `healthy`，`healthy-doctor` 的 Flyway 只维护 `healthy_doctor`。从旧的共享数据库升级时，按 [doctor-service 拆分清单](docs/doctor-service-extraction.md) 的数据库迁移章节执行，不能在数据复制完成前让 `healthy-server` 执行 V12。
+Gateway 对登录、注册放行；其他公开路由先验证 JWT 签名及 Redis 会话，再覆盖客户端
+伪造的身份请求头。下游服务不再重复解析 JWT。
 
-## 配置环境变量
+## 本地启动
 
-- `DB_HOST`、`DB_PORT`、`DB_NAME`、`DB_USERNAME`、`DB_PASSWORD`
-- `DOCTOR_DB_HOST`、`DOCTOR_DB_PORT`、`DOCTOR_DB_NAME`、`DOCTOR_DB_USERNAME`、`DOCTOR_DB_PASSWORD`
-- `REDIS_HOST`、`REDIS_PORT`、`REDIS_DATABASE`、`REDIS_PASSWORD`
-- `RABBITMQ_HOST`、`RABBITMQ_PORT`、`RABBITMQ_USERNAME`、`RABBITMQ_PASSWORD`
-- `NACOS_SERVER_ADDR`、`NACOS_USERNAME`、`NACOS_PASSWORD`
-- `SENTINEL_DASHBOARD`
-- `JWT_SECRET`（Gateway 必须与签发 Token 的 `healthy-server` 保持一致）
+本地开发继续使用电脑上已经安装的 MySQL、Redis 和 RabbitMQ，不用 Docker 启动这三项。
+只有 Nacos 使用项目根目录的 `compose.microservices.yaml`。
 
-密码不提交到仓库；本地可在 IDE 运行配置中设置上述变量。
+1. 确认 MySQL `3306`、Redis `6379`、RabbitMQ `5672` 已启动。
+2. 准备三个数据库：`healthy`、`healthy_doctor`、`healthy_identity`。
+3. 在项目根目录启动 Nacos：
 
-其中 `DB_*` 属于 identity/booking 数据库，`DOCTOR_DB_*` 属于 doctor-service 数据库。即使两个数据库暂时位于同一个 MySQL 实例，也应使用不同数据库名；生产环境建议再配置两个权限隔离的数据库账号。
+   ```bash
+   docker compose -f compose.microservices.yaml up -d nacos
+   ```
 
-## 当前目录职责
+4. 配置各服务数据库密码以及统一的 `JWT_SECRET`、Redis database。
+5. 在本目录构建：
 
-- `healthy-server/controller`：identity、booking 与患者聚合接口层
-- `healthy-server/service`：预约业务编排与事务边界
-- `healthy-server/domain`：跨领域端口、Feign 适配器与批量视图装配
-- `healthy-server/mapper`：identity、booking 数据访问接口与 XML
-- `healthy-gateway`：统一路由、服务发现、限流接入和 Trace ID 透传
-- `healthy-doctor`：医生与科室主数据服务；独占 `healthy_doctor` 数据库、Flyway、实体、DTO 和 VO，医生/科室管理 API 和患者科室查询已直接对接 Gateway
-- `healthy-pojo`：identity/booking 暂时共用的实体、DTO 和 VO；后续随服务拆分继续收窄
-- `healthy-common`：统一响应、异常与错误码
+   ```bash
+   mvn clean package
+   ```
 
-详细的边界、调用关系与后续抽取顺序见 [微服务演进说明](docs/microservice-evolution.md)。
+6. 依次启动：
+
+   ```bash
+   java -jar healthy-identity/target/healthy-identity-0.0.1-SNAPSHOT.jar
+   java -jar healthy-doctor/target/healthy-doctor-0.0.1-SNAPSHOT.jar
+   java -jar healthy-server/target/healthy-server-0.0.1-SNAPSHOT.jar
+   java -jar healthy-gateway/target/healthy-gateway-0.0.1-SNAPSHOT.jar
+   ```
+
+端口分别为 Gateway `8080`、Booking `8081`、Doctor `8082`、Identity `8083`。
+Nacos 控制台为 `http://localhost:8849/nacos/`。
+
+## 从共享数据库升级
+
+数据库迁移必须遵循“先建目标表、再复制校验、最后删源表”：
+
+- Doctor 拆分参见 [doctor-service-extraction.md](docs/doctor-service-extraction.md)。
+- Identity 拆分参见 [identity-service-extraction.md](docs/identity-service-extraction.md)。
+
+`healthy-server` 的 V12 会删除旧医生/科室表，V13 会删除旧账号/患者表。禁止在复制脚本
+的 mismatch 和 orphan 校验全部为 0 之前执行相应删除迁移。
+
+## 配置变量
+
+- Booking：`DB_HOST`、`DB_PORT`、`DB_NAME`、`DB_USERNAME`、`DB_PASSWORD`
+- Doctor：`DOCTOR_DB_HOST`、`DOCTOR_DB_PORT`、`DOCTOR_DB_NAME`、`DOCTOR_DB_USERNAME`、`DOCTOR_DB_PASSWORD`
+- Identity：`IDENTITY_DB_HOST`、`IDENTITY_DB_PORT`、`IDENTITY_DB_NAME`、`IDENTITY_DB_USERNAME`、`IDENTITY_DB_PASSWORD`
+- 公共基础设施：`REDIS_*`、`RABBITMQ_*`、`NACOS_*`
+- 安全：`JWT_SECRET`。Identity 与 Gateway 必须使用完全相同的值。
+
+密码与 JWT 密钥不要提交到仓库。开发机可使用被 Git 忽略的 `application-local.yml`
+或 IDE 环境变量。
+
+## Docker Compose 部署
+
+根目录 `compose.yaml` 已包含 Gateway、三个业务服务、Nacos、MySQL、Redis、RabbitMQ
+和前端。复制 `.env.example` 为 `.env` 并替换所有密码后运行：
+
+```bash
+docker compose up -d --build
+```
+
+MySQL 初始化脚本会为三个服务创建独立数据库和最小作用域账号。已有 MySQL volume 不会
+重新执行初始化脚本，旧环境必须先按上述拆分文档完成数据迁移。
+
+## 验证
+
+```bash
+mvn clean test
+```
+
+完整测试会验证应用上下文、Gateway 路由、Feign 适配器、权限拦截器、预约并发、
+候补、Outbox 与数据库边界。

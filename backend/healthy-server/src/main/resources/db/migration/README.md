@@ -7,6 +7,7 @@ Flyway owns the schema in this directory.
 - An existing pre-Flyway database is baselined at version `8`, so neither `B8` nor `V1` through `V8` is executed there.
 - `V9` and every later `V` migration are applied to both baselined databases and new databases.
 - `V12` removes `doctor` and `department` after their data has moved to the database owned by `healthy-doctor`. The historical migrations still create these tables before V12 on a brand-new booking database because applied migrations are immutable.
+- `V13` removes `patient` and `sys_user` after `scripts/db/copy-identity-data.sql` has copied and verified them in the database owned by `healthy-identity`.
 
 After a migration has been applied anywhere, do not rename, delete, reorder, or edit it. Add a new migration with the next version instead.
 

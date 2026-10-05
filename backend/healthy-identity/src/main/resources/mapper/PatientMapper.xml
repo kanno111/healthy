@@ -1,0 +1,47 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.healthy.identity.mapper.PatientMapper">
+    <select id="findEnabledByUserId" resultType="com.healthy.identity.model.PatientQueryView">
+        SELECT patient.id,
+               patient.user_id,
+               COALESCE(patient.real_name, account.name, account.username) AS name,
+               account.username,
+               account.phone,
+               patient.status
+        FROM patient
+        INNER JOIN sys_user account ON account.id = patient.user_id
+        WHERE patient.user_id = #{userId}
+          AND patient.status = 1
+          AND account.status = 1
+        LIMIT 1
+    </select>
+
+    <select id="listViewsByIds" resultType="com.healthy.identity.model.PatientQueryView">
+        SELECT patient.id,
+               patient.user_id,
+               COALESCE(patient.real_name, account.name, account.username) AS name,
+               account.username,
+               account.phone,
+               patient.status
+        FROM patient
+        INNER JOIN sys_user account ON account.id = patient.user_id
+        WHERE patient.id IN
+        <foreach collection="patientIds" item="patientId" open="(" separator="," close=")">
+            #{patientId}
+        </foreach>
+        ORDER BY patient.id
+    </select>
+
+    <select id="findIdsByKeyword" resultType="java.lang.Long">
+        SELECT patient.id
+        FROM patient
+        INNER JOIN sys_user account ON account.id = patient.user_id
+        WHERE patient.real_name LIKE CONCAT('%', #{keyword}, '%')
+           OR account.name LIKE CONCAT('%', #{keyword}, '%')
+           OR account.username LIKE CONCAT('%', #{keyword}, '%')
+           OR account.phone LIKE CONCAT('%', #{keyword}, '%')
+        ORDER BY patient.id
+    </select>
+</mapper>

@@ -1,7 +1,7 @@
 package com.healthy.appointment.controller.user;
 
 import com.healthy.appointment.dto.AppointmentWaitlistCreateDTO;
-import com.healthy.appointment.interceptor.JwtAuthInterceptor;
+import com.healthy.appointment.interceptor.GatewayIdentityInterceptor;
 import com.healthy.appointment.result.ApiResponse;
 import com.healthy.appointment.service.AppointmentWaitlistService;
 import com.healthy.appointment.vo.PatientAppointmentWaitlistVO;
@@ -26,7 +26,7 @@ public class AppointmentWaitlistController {
 
     @PostMapping
     public ApiResponse<PatientAppointmentWaitlistVO> join(
-            @RequestAttribute(JwtAuthInterceptor.CURRENT_USER_ID) Long userId,
+            @RequestAttribute(GatewayIdentityInterceptor.CURRENT_USER_ID) Long userId,
             @Valid @RequestBody AppointmentWaitlistCreateDTO appointmentWaitlistCreateDTO
     ) {
         return ApiResponse.success(appointmentWaitlistService.join(userId, appointmentWaitlistCreateDTO));
@@ -34,14 +34,14 @@ public class AppointmentWaitlistController {
 
     @GetMapping
     public ApiResponse<List<PatientAppointmentWaitlistVO>> listMyWaitlists(
-            @RequestAttribute(JwtAuthInterceptor.CURRENT_USER_ID) Long userId
+            @RequestAttribute(GatewayIdentityInterceptor.CURRENT_USER_ID) Long userId
     ) {
         return ApiResponse.success(appointmentWaitlistService.listMyWaitlists(userId));
     }
 
     @PatchMapping("/{waitlistId}/cancel")
     public ApiResponse<Void> cancel(
-            @RequestAttribute(JwtAuthInterceptor.CURRENT_USER_ID) Long userId,
+            @RequestAttribute(GatewayIdentityInterceptor.CURRENT_USER_ID) Long userId,
             @PathVariable Long waitlistId
     ) {
         appointmentWaitlistService.cancel(userId, waitlistId);
@@ -50,7 +50,7 @@ public class AppointmentWaitlistController {
 
     @PostMapping("/{waitlistId}/confirm")
     public ApiResponse<Void> confirm(
-            @RequestAttribute(JwtAuthInterceptor.CURRENT_USER_ID) Long userId,
+            @RequestAttribute(GatewayIdentityInterceptor.CURRENT_USER_ID) Long userId,
             @PathVariable Long waitlistId
     ) {
         appointmentWaitlistService.confirm(userId, waitlistId);

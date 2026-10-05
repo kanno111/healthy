@@ -50,5 +50,6 @@
         <module>healthy-server</module>
         <module>healthy-gateway</module>
         <module>healthy-doctor</module>
+        <module>healthy-identity</module>
     </modules>
 </project>

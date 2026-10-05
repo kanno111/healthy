@@ -6,9 +6,10 @@ FROM public.ecr.aws/docker/library/maven:3.9.16-eclipse-temurin-21-noble AS buil
 WORKDIR /workspace
 COPY . .
 
+ARG APP_MODULE=healthy-server
 RUN --mount=type=cache,target=/root/.m2 \
-    mvn -B -pl healthy-server -am package -DskipTests \
-    && cp healthy-server/target/healthy-server-*.jar /workspace/app.jar
+    mvn -B -pl "${APP_MODULE}" -am package -DskipTests \
+    && cp "${APP_MODULE}"/target/"${APP_MODULE}"-*.jar /workspace/app.jar
 
 # Stage 2: run the application with a smaller JRE-only image.
 FROM public.ecr.aws/docker/library/eclipse-temurin:21.0.12_8-jre-noble
@@ -21,6 +22,6 @@ RUN groupadd --system app \
 COPY --from=builder --chown=app:app /workspace/app.jar /app/app.jar
 
 USER app
-EXPOSE 8080
+EXPOSE 8080 8081 8082 8083
 
 ENTRYPOINT ["java", "-jar", "/app/app.jar"]

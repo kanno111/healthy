@@ -56,6 +56,29 @@ class HealthyGatewayApplicationTests {
     }
 
     @Test
+    void routesAuthApisToIdentityServiceBeforeServerCatchAll() {
+        List<RouteDefinition> routes = routeDefinitionLocator.getRouteDefinitions().collectList().block();
+
+        assertThat(routes).isNotNull();
+        RouteDefinition identityRoute = routes.stream()
+                .filter(route -> "healthy-identity-auth".equals(route.getId()))
+                .findFirst()
+                .orElseThrow();
+        RouteDefinition serverRoute = routes.stream()
+                .filter(route -> "healthy-server".equals(route.getId()))
+                .findFirst()
+                .orElseThrow();
+
+        assertThat(identityRoute.getUri()).hasToString("lb://healthy-identity");
+        assertThat(identityRoute.getOrder()).isLessThan(serverRoute.getOrder());
+        assertThat(identityRoute.getPredicates()).singleElement()
+                .satisfies(predicate -> {
+                    assertThat(predicate.getName()).isEqualTo("Path");
+                    assertThat(predicate.getArgs()).containsValue("/api/auth/**");
+                });
+    }
+
+    @Test
     void routesDoctorAdminApisToDoctorServiceBeforeServerCatchAll() {
         List<RouteDefinition> routes = routeDefinitionLocator.getRouteDefinitions().collectList().block();
 

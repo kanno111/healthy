@@ -1,7 +1,7 @@
 package com.healthy.appointment.controller.user;
 
 import com.healthy.appointment.dto.AppointmentCreateDTO;
-import com.healthy.appointment.interceptor.JwtAuthInterceptor;
+import com.healthy.appointment.interceptor.GatewayIdentityInterceptor;
 import com.healthy.appointment.result.ApiResponse;
 import com.healthy.appointment.service.AppointmentService;
 import com.healthy.appointment.vo.PatientAppointmentVO;
@@ -27,7 +27,7 @@ public class AppointmentController {
     @PostMapping
     /** 使用当前登录患者的身份创建预约，并扣减所选班次的剩余号源。 */
     public ApiResponse<PatientAppointmentVO> create(
-            @RequestAttribute(JwtAuthInterceptor.CURRENT_USER_ID) Long userId,
+            @RequestAttribute(GatewayIdentityInterceptor.CURRENT_USER_ID) Long userId,
             @Valid @RequestBody AppointmentCreateDTO appointmentCreateDTO
     ) {
         return ApiResponse.success(appointmentService.create(userId, appointmentCreateDTO));
@@ -36,13 +36,13 @@ public class AppointmentController {
     @GetMapping
     /** 查询当前登录患者的预约记录，按创建时间倒序返回。 */
     public ApiResponse<List<PatientAppointmentVO>> listMyAppointments(
-            @RequestAttribute(JwtAuthInterceptor.CURRENT_USER_ID) Long userId
+            @RequestAttribute(GatewayIdentityInterceptor.CURRENT_USER_ID) Long userId
     ) {
         return ApiResponse.success(appointmentService.listMyAppointments(userId));
     }
 
     @PatchMapping("/{id}/cancel")
-    public ApiResponse<Void> cancel(@RequestAttribute(JwtAuthInterceptor.CURRENT_USER_ID) Long userId, @PathVariable Long id) {
+    public ApiResponse<Void> cancel(@RequestAttribute(GatewayIdentityInterceptor.CURRENT_USER_ID) Long userId, @PathVariable Long id) {
         appointmentService.cancel(userId, id);
         return ApiResponse.success();
     }
